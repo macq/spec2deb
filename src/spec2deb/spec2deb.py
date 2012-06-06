@@ -310,7 +310,7 @@ class RpmSpecToDebianControl:
             self.endof_changelog()
         else:
             print "UNKNOWN state '%s' (at end of file)" % self.state
-    def package_mapping(name, package):
+    def package_mapping(self, package):
         known = { "zlib-dev" : "zlib1g-dev",
                   "sdl-dev" : "libsdl-dev",
                   "sdl" : "libsdl",
@@ -407,7 +407,7 @@ class RpmSpecToDebianControl:
         if not os.path.exists(filename):
             return "0" * 32
         import hashlib
-        md5 = hashlib.md5()
+        md5 = hashlib.md5() #@UndefinedVariable
         md5.update(open(filename).read())
         return md5.hexdigest()
     def group2section(self, group):
