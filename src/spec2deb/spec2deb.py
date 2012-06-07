@@ -367,15 +367,20 @@ class RpmSpecToDebianControl:
         if x:
             sourcefile = sourcefile[x+1:]
         return sourcefile
+    def deb_version(self):
+        return self.var.get("version","")
     def deb_source(self, sourcefile = None):
-        if sourcefile is None:
-            sourcefile = self.deb_sourcefile()
-        source = sourcefile
-        for ext in [ ".tar.gz", ".tar.bz2"]:
-            if source.endswith(ext):
-                source = source[:-(len(ext))]
-                break
-        return source
+        return self.var.get("name")
+    def deb_src(self):
+        script = self.packages["%{name}"].get("%prep", "")
+        for part in script:
+            for line in part.split("\n"):
+                if line.startswith("%setup"):
+                    m = re.search("-n\s+(    \S+)", line)
+                    if m:
+                        return m.group(1)
+                    return self.deb_source()+"-"+self.deb_version()
+        _log.error("no %setup in %prep section found")
     def debian_dsc(self, next = NEXT, into = None):
         yield next+"debian/dsc"
         yield "+Format: %s" % FORMAT
@@ -641,6 +646,8 @@ class RpmSpecToDebianControl:
     def debian_diff(self):
         for deb in (self.debian_control, self.debian_copyright, self.debian_install,
                     self.debian_changelog, self.debian_rules, self.debian_patches):
+            src = self.deb_src()
+            old = src+".orig"
             patch = None
             lines = []
             for line in deb(NEXT):
@@ -649,9 +656,9 @@ class RpmSpecToDebianControl:
                     line = " ".join(line)
                 if line.startswith(NEXT):
                     if patch:
-                        yield "--- %s..." % patch
-                        yield "+++ %s" % patch
-                        yield "@@ 0,0 1,%i @@" % (len(lines))
+                        yield "--- %s/%s" % (old, patch)
+                        yield "+++ %s/%s" % (src, patch)
+                        yield "@@ -0,0 +1,%i @@" % (len(lines))
                         for plus in lines:
                             yield plus
                     lines = []
@@ -662,9 +669,9 @@ class RpmSpecToDebianControl:
             if True:
                 if lines:
                     if patch:
-                        yield "--- %s..." % patch
-                        yield "+++ %s" % patch
-                        yield "@@ 0,0 1,%i @@" % (len(lines))
+                        yield "--- %s/%s" % (old, patch)
+                        yield "+++ %s/%s" % (src, patch)
+                        yield "@@ -0,0 +1,%i @@" % (len(lines))
                         for plus in lines:
                             yield plus
                     else:
@@ -875,9 +882,9 @@ if __name__ == "__main__":
         if not opts.dsc:
             opts.dsc = spec+".dsc"
         if not opts.diff:
-            opts.diff = spec+".debian.diff.gz"
+            opts.diff = "%s_%s-0.diff.gz" % (work.deb_source(), work.deb_version())
         if not opts.tar:
-            opts.tar = spec+".orig.tar.gz"
+            opts.tar = "%s_%s.orig.tar.gz" % (work.deb_source(), work.deb_version())
         debtransform = False
         if not os.path.isdir(opts.d):
             os.mkdir(opts.d)
