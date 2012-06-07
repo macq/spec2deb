@@ -16,6 +16,11 @@ import os.path
 import gzip
 import tarfile
 import tempfile
+import logging
+
+_log = logging.getLogger(__name__)
+urgency = "low"
+unstable = "stable"
 
 debtransform = False
 if os.path.isdir(".osc"):
@@ -171,8 +176,7 @@ class RpmSpecToDebianControl:
                 elif not line.strip():
                     pass
                 else:
-                    print "ERROR: %s unmatched line:" % self.state
-                    print " ", line,
+                    _log.error("%s unmatched line:\n %s", self.state, line)
             elif self.state in [ "description"]:
                 found_package = self.on_package.match(line)
                 found_description = self.on_description.match(line)
@@ -294,7 +298,7 @@ class RpmSpecToDebianControl:
                 else:
                     self.append_section(line)
             else:
-                print "UNKNOWN state '%s'" % self.state
+                _log.fatal("UNKNOWN state '%s'", self.state)
         # for line
         if self.state in [ "package"]:
             pass
@@ -309,7 +313,7 @@ class RpmSpecToDebianControl:
         elif self.state in [ "changelog" ]:
             self.endof_changelog()
         else:
-            print "UNKNOWN state '%s' (at end of file)" % self.state
+            _log.fatal("UNKNOWN state '%s' (at end of file)", self.state)
     def package_mapping(self, package):
         known = { "zlib-dev" : "zlib1g-dev",
                   "sdl-dev" : "libsdl-dev",
@@ -493,7 +497,7 @@ class RpmSpecToDebianControl:
         version = self.expand(self.var.get("version"))
         packager = self.expand(self.var.get("packager"))
         yield next+"debian/changelog"
-        yield "+%s (%s) stable; urgency=low" % (name, version)
+        yield "+%s (%s) %s; urgency=%s" % (name, version, distribution, urgency)
         yield "+"
         yield "+ * generated OBS deb build"
         yield "+"
@@ -621,7 +625,7 @@ class RpmSpecToDebianControl:
                 for line in open(patch):
                     yield "+"+line
         else:
-            print "HINT: no patches, no debian/patches/series"
+            _log.info("no patches, no debian/patches/series")
     def debian_diff(self):
         for deb in (self.debian_control, self.debian_copyright, self.debian_install,
                     self.debian_changelog, self.debian_rules, self.debian_patches):
@@ -629,7 +633,7 @@ class RpmSpecToDebianControl:
             lines = []
             for line in deb(NEXT):
                 if isinstance(line, tuple):
-                    print "??", deb, line
+                    _log.fatal("?? %s %s", deb, line)
                     line = " ".join(line)
                 if line.startswith(NEXT):
                     if patch:
@@ -652,7 +656,7 @@ class RpmSpecToDebianControl:
                         for plus in lines:
                             yield plus
                     else:
-                        print "ERROR: have lines but no patch name:", deb
+                        _log.error("have lines but no patch name: %s", deb)
     def write_debian_dsc(self, filename):
         f = open(filename, "w")
         try:
@@ -717,8 +721,7 @@ class RpmSpecToDebianControl:
                 if line.startswith("+") and state == "+":
                     f.write(line[1:] + "\n")
                     continue
-                print "OOPS, unknown %s line:\n" % state
-                print line
+                _log.warning("unknown %s line:\n %s", state, line)
             tar.close()
             self.debian_file_size = os.path.getsize(filename)
             return "written '%s'" % filename
@@ -735,11 +738,15 @@ class RpmSpecToDebianControl:
 
 
 from optparse import OptionParser
-_hint = """NOTE: if neither -f nor -d is given (or any --debian-output) then 
+_hint = """NOTE: if neither -f nor -o is given (or any --debian-output) then 
 both of these two are generated from the last given *.spec argument file name.""" 
 _o = OptionParser("%program [options] package.spec", description = __doc__, epilog = _hint)
-_o.add_option("-v","--vars",action="count", help="show the variables after parsing")
-_o.add_option("-p","--packages",action="count", help="show the package settings after parsing")
+_o.add_option("-v","--verbose", action="count", help="show more runtime messages", default=0)
+_o.add_option("-0","--quiet", action="count", help="show less runtime messages", default=0)
+_o.add_option("-1","--vars",action="count", help="show the variables after parsing")
+_o.add_option("-2","--packages",action="count", help="show the package settings after parsing")
+_o.add_option("--urgency", metavar=urgency, help="set urgency level for debian/changelog")
+_o.add_option("--unstable", metavar=unstable, help="set distribution level for debian/changelog")
 _o.add_option("-C","--debian-control",action="count", help="output for the debian/control file")
 _o.add_option("-L","--debian-copyright",action="count", help="output for the debian/copyright file")
 _o.add_option("-I","--debian-install",action="count", help="output for the debian/*.install files")
@@ -748,7 +755,7 @@ _o.add_option("-R","--debian-rules",action="count", help="output for the debian/
 _o.add_option("-P","--debian-patches",action="count", help="output for the debian/patches/*")
 _o.add_option("-F","--debian-diff",action="count", help="output for the debian.diff combined file")
 _o.add_option("-D","--debian-dsc",action="count", help="output for the debian *.dsc descriptor")
-_o.add_option("-d","--dsc",metavar="FILE", help="create the debian.dsc descriptor file")
+_o.add_option("-o","--dsc",metavar="FILE", help="create the debian.dsc descriptor file")
 _o.add_option("-f","--diff",metavar="FILE", help="""create the debian.diff.gz file 
 (depending on the given filename it can also be a debian.tar.gz with the same content)""")
 _o.add_option("--no-debtransform",action="count", help="disable dependency on OBS debtransform")
@@ -756,6 +763,10 @@ _o.add_option("--debtransform",action="count", help="enable dependency on OBS de
 
 if __name__ == "__main__":
     opts, args = _o.parse_args()
+    logging.basicConfig(format = "%(levelname)s: %(message)s",
+                        level = max(0, logging.INFO - 5 * (opts.verbose - opts.quiet)))
+    DONE = logging.INFO + 5; logging.addLevelName(DONE, "DONE")
+    HINT = logging.INFO - 5; logging.addLevelName(HINT, "HINT")
     work = RpmSpecToDebianControl()
     spec = None
     for arg in args:
@@ -767,18 +778,26 @@ if __name__ == "__main__":
         debtransform = False
     if opts.debtransform:
         debtransform = True
+    if opts.urgency:
+        urgency = urgency
+    if opts.distribution:
+        distribution = distribution
     if opts.vars:
         done += opts.vars
-        print "have", len(work.var), "variables:"
+        print "# have %s variables" % len(work.var)
         for name in sorted(work.var):
-            print " %s=%s" %(name, work.var[name])
+            print " %s='%s'" % (name, work.var[name])
+    else:
+        _log.log(HINT, "have %s variables (use -1 to show them)" % len(work.var))
     if opts.packages:
         done += opts.packages
-        print "have", len(work.packages), "packages:"
+        print "# have %s packages" % len(work.packages)
         for package in sorted(work.packages):
             print " %package -n", package
             for name in sorted(work.packages[package]):
                 print "  %s:%s" %(name, work.packages[package][name])
+    else:
+        _log.log(HINT, "have %s packages (use -2 to show them)" % len(work.packages))
     if opts.debian_control:
         done += opts.debian_control
         for line in work.debian_control():
@@ -819,9 +838,10 @@ if __name__ == "__main__":
             work.debian_file = "debian.tar.gz"
         opts.dsc = spec+".dsc"
         opts.diff = work.debian_file
+        _log.log(HINT, "automatically selecting -o %s -f %s", opts.dsc, opts.diff)
     if opts.diff:
-        print work.write_debian_diff(opts.diff)
+        _log.log(DONE, work.write_debian_diff(opts.diff))
     if opts.dsc:
-        print work.write_debian_dsc(opts.dsc)
-    print "done", len(work.packages), "packages from", args
+        _log.log(DONE, work.write_debian_dsc(opts.dsc))
+    _log.info("converted %s packages from %s", len(work.packages), args)
 
