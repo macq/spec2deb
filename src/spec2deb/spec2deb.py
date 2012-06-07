@@ -69,6 +69,11 @@ class RpmSpecToDebianControl:
                      "_mandir" : "/usr/share/man",
                      "_docdir" : "/usr/share/doc",
                    }
+        self.commands = {
+                        "%__make" : "$(MAKE)",
+                        "%__rm" : "rm",
+                        "%__mkdir_p" : "mkdir -p",
+                        }
         self.urgency = urgency
         self.promote = promote
         self.standards_version = standards_version
@@ -663,12 +668,18 @@ class RpmSpecToDebianControl:
                 line = line.replace("DESTDIR=%{buildroot}", "DESTDIR=$(CURDIR)/debian/tmp")
                 line = line.replace("%buildroot", "$(CURDIR)")
                 line = line.replace("%{buildroot}", "$(CURDIR)")
-                line = line.replace("%__make", "$(MAKE)")
                 line = line.replace("$RPM_OPT_FLAGS", "$(CFLAGS)")
                 line = line.replace("%{?jobs:-j%jobs}", "")
+                for name in self.commands:
+                    command = self.commands[name]
+                    line = line.replace(name, command)
                 for name in self.var.keys():
                     if name.startswith("_"):
                         line = line.replace("%{"+name+"}", "$("+name+")")
+                if line.strip() == "rm -rf $(CURDIR)":
+                    if section != "%clean":
+                        _log.warning("found rm -rf %%buildroot in section %s", section)
+                    line = ""
                 if line.strip():
                     yield line
     def debian_patches(self, next = NEXT):
@@ -935,13 +946,11 @@ if __name__ == "__main__":
     if opts.d:
         if not opts.dsc:
             opts.dsc = spec+".dsc"
-        print "opts.diff = ", opts.diff
         if not opts.diff:
             if "3." in work.format:
                 opts.diff = "%s_%s-0.debian.tar.gz" % (work.deb_source(), work.deb_version())
             else:
                 opts.diff = "%s_%s-0.diff.gz" % (work.deb_source(), work.deb_version())
-        print "opts.diff = ", opts.diff
         if not opts.tar:
             opts.tar = "%s_%s.orig.tar.gz" % (work.deb_source(), work.deb_version())
         work.debtransform = False
