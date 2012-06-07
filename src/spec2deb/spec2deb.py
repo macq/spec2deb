@@ -43,6 +43,14 @@ if os.path.isdir(".osc"):
 NEXT = "--- "
 FORMAT = "1.0" # "2.0" # "3.0 (quilt)" # 
 
+_formats = { 
+    "1" : "1.0", 
+    "1.0" : "1.0",
+    "3" : "3.0 (quilt)", 
+    "3.0" : "3.0 (quilt)", 
+    "3.0 (quilt)" : "3.0 (quilt)"
+}
+
 class RpmSpecToDebianControl:
     on_comment = re.compile("^#.*")
     def __init__(self):
@@ -61,6 +69,19 @@ class RpmSpecToDebianControl:
                      "_mandir" : "/usr/share/man",
                      "_docdir" : "/usr/share/doc",
                    }
+        self.urgency = urgency
+        self.promote = promote
+        self.standards_version = standards_version
+        self.format = FORMAT
+        self.debtransform = debtransform
+    def set_format(self, value):
+        if not value:
+            pass
+        elif value in _formats:
+            self.format = _formats[value]
+            _log.info("using source format '%s'" % self.format)
+        else:
+            _log.fatal("unknown source format: '%s'" % value)
     def new_state(self, state):
         self.state = state
     on_explicit_package = re.compile(r"-n\s+(\S+)")
@@ -384,7 +405,7 @@ class RpmSpecToDebianControl:
         _log.error("no %setup in %prep section found")
     def debian_dsc(self, next = NEXT, into = None):
         yield next+"debian/dsc"
-        yield "+Format: %s" % FORMAT
+        yield "+Format: %s" % self.format
         sourcefile = self.deb_sourcefile()
         source = self.deb_source(sourcefile)
         yield "+Source: %s" % self.expand(source)
@@ -394,7 +415,7 @@ class RpmSpecToDebianControl:
         version = self.var.get("version","0")+"-"+self.var.get("revision","0")
         yield "+Version: %s" % version
         yield "+Maintainer: %s" % self.var.get("packager","?")
-        yield "+Standards-Version: %s" % standards_version
+        yield "+Standards-Version: %s" % self.standards_version
         yield "+Homepage: %s" % self.var.get("url","")
         depends = list(self.deb_build_depends())
         yield "+Build-Depends: %s" % ", ".join(depends)
@@ -402,7 +423,7 @@ class RpmSpecToDebianControl:
         debian_file = self.debian_file
         if not debian_file:
             debian_file = "%s.debian.tar.gz" % (self.expand(source))
-        if debtransform:
+        if self.debtransform:
             yield "+Debtransform-Tar: %s" % source_file
             if ".tar." in debian_file:
                 yield "+Debtransform-Files-Tar: %s" % debian_file
@@ -460,7 +481,7 @@ class RpmSpecToDebianControl:
         yield "+Source: %s" % self.expand(source)
         depends = list(self.deb_build_depends())
         yield "+Build-Depends: %s" % ", ".join(depends)
-        yield "+Standards-Version: %s" % standards_version
+        yield "+Standards-Version: %s" % self.standards_version
         yield "+Homepage: %s" % self.var.get("url","")
         yield "+"
         for deb_package, package in sorted(self.deb_packages2()):
@@ -517,6 +538,8 @@ class RpmSpecToDebianControl:
         name = self.expand(self.var.get("name"))
         version = self.expand(self.var.get("version"))
         packager = self.expand(self.var.get("packager"))
+        promote = self.promote
+        urgency = self.urgency
         yield next+"debian/changelog"
         yield "+%s (%s) %s; urgency=%s" % (name, version, promote, urgency)
         yield "+"
@@ -629,8 +652,6 @@ class RpmSpecToDebianControl:
                 if line.strip():
                     yield line
     def debian_patches(self, next = NEXT):
-        yield next+"debian/source/format"
-        yield "+"+FORMAT
         patches = []
         for patch in self.var.get("patch", []):
             patches.append(patch)
@@ -647,6 +668,13 @@ class RpmSpecToDebianControl:
                     yield "+"+line
         else:
             _log.info("no patches -> no debian/patches/series")
+        yield next+"debian/source/format"
+        yield "+"+self.format
+    def p(self, subdir, patch):
+        if "3." in self.format or self.debtransform:
+            return patch
+        else:
+            return "%s/%s" % (subdir, patch)
     def debian_diff(self):
         for deb in (self.debian_control, self.debian_copyright, self.debian_install,
                     self.debian_changelog, self.debian_rules, self.debian_patches):
@@ -660,8 +688,8 @@ class RpmSpecToDebianControl:
                     line = " ".join(line)
                 if line.startswith(NEXT):
                     if patch:
-                        yield "--- %s/%s" % (old, patch)
-                        yield "+++ %s/%s" % (src, patch)
+                        yield "--- %s" % self.p(old, patch)
+                        yield "+++ %s" % self.p(src, patch)
                         yield "@@ -0,0 +1,%i @@" % (len(lines))
                         for plus in lines:
                             yield plus
@@ -673,8 +701,8 @@ class RpmSpecToDebianControl:
             if True:
                 if lines:
                     if patch:
-                        yield "--- %s/%s" % (old, patch)
-                        yield "+++ %s/%s" % (src, patch)
+                        yield "--- %s" % self.p(old, patch)
+                        yield "+++ %s" % self.p(src, patch)
                         yield "@@ -0,0 +1,%i @@" % (len(lines))
                         for plus in lines:
                             yield plus
@@ -696,7 +724,7 @@ class RpmSpecToDebianControl:
         return "ERROR", filename
     def write_debian_diff(self, filename, into = None):
         if filename.endswith(".tar.gz"):
-            return self.write_debian_tar(filename)
+            return self.write_debian_tar(filename, into = into)
         filepath = os.path.join(into or "", filename) 
         if filename.endswith(".gz"):
             f = gzip.open(filepath, "w")
@@ -715,7 +743,7 @@ class RpmSpecToDebianControl:
         return "ERROR: %s" % filepath
     def write_debian_tar(self, filename, into = None):
         if filename.endswith(".diff") or filename.endswith(".diff.gz"):
-            return self.write_debian_diff(filename)
+            return self.write_debian_diff(filename, into = into)
         filepath = os.path.join(into or "", filename) 
         if filename.endswith(".gz"):
             tar = tarfile.open(filepath, "w:gz")
@@ -746,8 +774,6 @@ class RpmSpecToDebianControl:
                     f.write(line[1:] + "\n")
                     continue
                 _log.warning("unknown %s line:\n %s", state, line)
-            tar.close()
-            return "written '%s'" % filepath
             if True:
                 if True:
                     if name:
@@ -755,7 +781,9 @@ class RpmSpecToDebianControl:
                         tar.add(f.name, name)
                         f.close()
                         name = ""
+            tar.close()
             self.debian_file = filename
+            return "written '%s'" % filepath
         finally:
             tar.close()
         return "ERROR: %s" % filepath
@@ -791,8 +819,9 @@ _o.add_option("-v","--verbose", action="count", help="show more runtime messages
 _o.add_option("-0","--quiet", action="count", help="show less runtime messages", default=0)
 _o.add_option("-1","--vars",action="count", help="show the variables after parsing")
 _o.add_option("-2","--packages",action="count", help="show the package settings after parsing")
-_o.add_option("-x","--extract", action="count", help="run dpkg-source -x after compiling")
-_o.add_option("-b","--build", action="count", help="run dpkg-source -b after compiling")
+_o.add_option("-x","--extract", action="count", help="run dpkg-source -x after generation")
+_o.add_option("-b","--build", action="count", help="run dpkg-source -b after generation")
+_o.add_option("--format",metavar=FORMAT, help="specify debian/source/format affecting generation")
 _o.add_option("--no-debtransform",action="count", help="disable dependency on OBS debtransform")
 _o.add_option("--debtransform",action="count", help="enable dependency on OBS debtransform (%default)", default = debtransform)
 _o.add_option("--urgency", metavar=urgency, help="set urgency level for debian/changelog")
@@ -819,6 +848,7 @@ if __name__ == "__main__":
     DONE = logging.INFO + 5; logging.addLevelName(DONE, "DONE")
     HINT = logging.INFO - 5; logging.addLevelName(HINT, "HINT")
     work = RpmSpecToDebianControl()
+    work.set_format(opts.format)
     spec = None
     for arg in args:
         work.parse(arg)
@@ -826,13 +856,13 @@ if __name__ == "__main__":
             spec = arg[:-(len(".spec"))]
     done = 0
     if opts.no_debtransform:
-        debtransform = False
+        work.debtransform = False
     if opts.debtransform:
-        debtransform = True
+        work.debtransform = True
     if opts.urgency:
-        urgency = opts.urgency
+        work.urgency = opts.urgency
     if opts.promote:
-        promote = opts.promote 
+        work.promote = opts.promote 
     if opts.vars:
         done += opts.vars
         print "# have %s variables" % len(work.var)
@@ -885,18 +915,26 @@ if __name__ == "__main__":
     if opts.d:
         if not opts.dsc:
             opts.dsc = spec+".dsc"
+        print "opts.diff = ", opts.diff
         if not opts.diff:
-            opts.diff = "%s_%s-0.diff.gz" % (work.deb_source(), work.deb_version())
+            if "3." in work.format:
+                opts.diff = "%s_%s-0.debian.tar.gz" % (work.deb_source(), work.deb_version())
+            else:
+                opts.diff = "%s_%s-0.diff.gz" % (work.deb_source(), work.deb_version())
+        print "opts.diff = ", opts.diff
         if not opts.tar:
             opts.tar = "%s_%s.orig.tar.gz" % (work.deb_source(), work.deb_version())
-        debtransform = False
+        work.debtransform = False
         if not os.path.isdir(opts.d):
             os.mkdir(opts.d)
     elif not done and not opts.diff and not opts.dsc:
         auto = True
-        work.debian_file = spec+".debian.diff.gz"
-        if debtransform:
+        if work.debtransform:
             work.debian_file = "debian.tar.gz"
+        elif "3." in work.format:
+            work.debian_file = spec+".debian.tar.gz"
+        else:
+            work.debian_file = spec+".debian.diff.gz"
         opts.dsc = spec+".dsc"
         opts.diff = work.debian_file
         _log.log(HINT, "automatically selecting -o %s -f %s", opts.dsc, opts.diff)
