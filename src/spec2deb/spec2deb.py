@@ -516,7 +516,10 @@ class RpmSpecToDebianControl:
         yield "+License: %s" % self.var.get("license","")
     def debian_install(self, next = NEXT):
         for deb_package, package in sorted(self.deb_packages2()):
-            yield next+("debian/%s.install" % deb_package)
+            files_name =  "debian/%s.install" % deb_package
+            dirs_name =  "debian/%s.dirs" % deb_package
+            files_list = []
+            dirs_list = []
             filesection = self.packages[package].get("%files", [""])
             if not isinstance(filesection, list): 
                 filesection = [ filesection ]
@@ -524,15 +527,32 @@ class RpmSpecToDebianControl:
                 for filespec in files.split("\n"):
                     path = self.expand(filespec.strip())
                     if path.startswith("%config"):
-                        path = path[len("%config"):].strip()
-                    if path.startswith("%doc"):
+                        path = path[len("%config"):]
+                        if path.startswith("/"):
+                            path = path[1:]
+                        files_list.append(path.strip())
+                    elif path.startswith("%doc"):
                         continue
-                    if path.startswith("%dir"):
+                    elif path.startswith("%dir"):
+                        path = path[len("%dir"):]
+                        if path.startswith("/"):
+                            path = path[1:]
+                        dirs_list.append(path.strip())
                         continue
-                    if path.startswith("%defattr"):
+                    elif path.startswith("%defattr"):
                         continue
-                    if path.startswith("/"):
-                        path = path[1:]
+                    else:
+                        if path.startswith("/"):
+                            path = path[1:]
+                        files_list.append(path.strip())
+                        continue
+            if dirs_list:
+                yield next+dirs_name
+                for path in dirs_list:
+                    yield "+"+path
+            if files_list:
+                yield next+files_name
+                for path in files_list:
                     yield "+"+path
     def debian_changelog(self, next = NEXT):
         name = self.expand(self.var.get("name"))
