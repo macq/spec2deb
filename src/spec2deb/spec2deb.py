@@ -45,7 +45,7 @@ class RpmSpecToDebianControl:
     on_comment = re.compile("^#.*")
     def __init__(self):
         self.debian_file = None
-        self.debian_file_size = 0
+        self.source_orig_file = None
         self.packages = {}
         self.package = ""
         self.section = ""
@@ -375,7 +375,7 @@ class RpmSpecToDebianControl:
                 source = source[:-(len(ext))]
                 break
         return source
-    def debian_dsc(self, next = NEXT):
+    def debian_dsc(self, next = NEXT, into = None):
         yield next+"debian/dsc"
         yield "+Format: %s" % FORMAT
         sourcefile = self.deb_sourcefile()
@@ -390,23 +390,34 @@ class RpmSpecToDebianControl:
         depends = list(self.deb_build_depends())
         yield "+Build-Depends: %s" % ", ".join(depends)
         source_file = self.expand(sourcefile)
-        source_file_size = os.path.getsize(source_file)
         debian_file = self.debian_file
         if not debian_file:
             debian_file = "%s.debian.tar.gz" % (self.expand(source))
-        debian_file_size = self.debian_file_size
-        if os.path.exists(debian_file):
-            debian_file_size = os.path.getsize(debian_file)
-        source_file_md5sum = self.md5sum(source_file)
-        debian_file_md5sum = self.md5sum(debian_file)
-        if not debtransform:
-            yield "+Files: %s" % ""
-            yield "+ %s %i %s" %( source_file_md5sum, source_file_size, source_file)
-            yield "+ %s %s %s" %( debian_file_md5sum, debian_file_size, debian_file)
-        else:
+        if debtransform:
             yield "+Debtransform-Tar: %s" % source_file
             if ".tar." in debian_file:
                 yield "+Debtransform-Files-Tar: %s" % debian_file
+        else:
+            source_orig = self.source_orig_file or source_file
+            source_orig_path = os.path.join(into or "", source_orig)
+            debian_file_path = os.path.join(into or "", debian_file)
+            source_orig_md5sum = self.md5sum(source_orig_path)
+            debian_file_md5sum = self.md5sum(debian_file_path)
+            if os.path.exists(source_orig_path):
+                source_orig_size = os.path.getsize(source_orig_path)
+                _log.debug("source_orig '%s' size %s", source_orig_path, source_orig_size)
+            else:
+                source_orig_size = 0
+                _log.info("source_orig '%s' not found", source_orig_path)
+            if os.path.exists(debian_file_path):
+                debian_file_size = os.path.getsize(debian_file_path)
+                _log.debug("debian_file '%s' size %s", debian_file_path, debian_file_size)
+            else:
+                debian_file_size = 0
+                _log.info("debian_file '%s' not found", debian_file_path)
+            yield "+Files: %s" % ""
+            yield "+ %s %i %s" %( source_orig_md5sum, source_orig_size, source_orig)
+            yield "+ %s %s %s" %( debian_file_md5sum, debian_file_size, debian_file)
     def md5sum(self, filename):
         if not os.path.exists(filename):
             return "0" * 32
@@ -625,7 +636,7 @@ class RpmSpecToDebianControl:
                 for line in open(patch):
                     yield "+"+line
         else:
-            _log.info("no patches, no debian/patches/series")
+            _log.info("no patches -> no debian/patches/series")
     def debian_diff(self):
         for deb in (self.debian_control, self.debian_copyright, self.debian_install,
                     self.debian_changelog, self.debian_rules, self.debian_patches):
@@ -657,46 +668,47 @@ class RpmSpecToDebianControl:
                             yield plus
                     else:
                         _log.error("have lines but no patch name: %s", deb)
-    def write_debian_dsc(self, filename):
-        f = open(filename, "w")
+    def write_debian_dsc(self, filename, into = None):
+        filepath = os.path.join(into or "", filename) 
+        f = open(filepath, "w")
         try:
             count = 0
-            for line in self.debian_dsc():
+            for line in self.debian_dsc(into = into):
                 if line.startswith(NEXT):
                     continue
                 f.write(line[1:]+"\n")
                 count +=1
-            return "written '%s' with %i lines" % (filename, count)
+            return "written '%s' with %i lines" % (filepath, count)
         finally:
             f.close()
         return "ERROR", filename
-    def write_debian_diff(self, filename):
+    def write_debian_diff(self, filename, into = None):
         if filename.endswith(".tar.gz"):
             return self.write_debian_tar(filename)
+        filepath = os.path.join(into or "", filename) 
         if filename.endswith(".gz"):
-            f = gzip.open(filename, "w")
+            f = gzip.open(filepath, "w")
         else:
-            f = open(filename, "w")
+            f = open(filepath, "w")
         try:
-            size = 0
             count = 0
             for line in self.debian_diff():
                 f.write(line+"\n")
                 count += 1
-                size += len(line) + 1
             f.close()
-            self.debian_file_size = os.path.getsize(filename)
-            return "written '%s' with %i lines and %i bytes" % (filename, count, size)
+            self.debian_file = filename
+            return "written '%s' with %i lines" % (filepath, count)
         finally:
             f.close()
-        return "ERROR", filename
-    def write_debian_tar(self, filename):
+        return "ERROR: %s" % filepath
+    def write_debian_tar(self, filename, into = None):
         if filename.endswith(".diff") or filename.endswith(".diff.gz"):
             return self.write_debian_diff(filename)
+        filepath = os.path.join(into or "", filename) 
         if filename.endswith(".gz"):
-            tar = tarfile.open(filename, "w:gz")
+            tar = tarfile.open(filepath, "w:gz")
         else:
-            tar = tarfile.open(filename, "w:")
+            tar = tarfile.open(filepath, "w:")
         try:
             state = None
             name = ""
@@ -723,8 +735,7 @@ class RpmSpecToDebianControl:
                     continue
                 _log.warning("unknown %s line:\n %s", state, line)
             tar.close()
-            self.debian_file_size = os.path.getsize(filename)
-            return "written '%s'" % filename
+            return "written '%s'" % filepath
             if True:
                 if True:
                     if name:
@@ -732,26 +743,30 @@ class RpmSpecToDebianControl:
                         tar.add(f.name, name)
                         f.close()
                         name = ""
+            self.debian_file = filename
         finally:
             tar.close()
-        return "ERROR", filename
-    def write_debian_orig_tar(self, filename):
+        return "ERROR: %s" % filepath
+    def write_debian_orig_tar(self, filename, into = None):
         sourcefile = self.expand(self.deb_sourcefile())
+        filepath = os.path.join(into or "", filename) 
         if sourcefile.endswith(".tar.gz"):
             _log.info("copy %s to %s", sourcefile, filename)
             import shutil
-            shutil.copyfile(sourcefile, filename)
-            return "written %s" % filename
+            shutil.copyfile(sourcefile, filepath)
+            self.source_orig_file = filename
+            return "written '%s'" % filepath
         elif sourcefile.endswith(".tar.bz2"):
             _log.info("recompress %s to %s", sourcefile, filename)
             import bz2
             import gzip
-            gz = gzip.GzipFile(filename, "w")
+            gz = gzip.GzipFile(filepath, "w")
             bz = bz2.BZ2File(sourcefile, "r")
             gz.write(bz.read())
             gz.close()
             bz.close()
-            return "written %s" % filename
+            self.source_orig_file = filename
+            return "written '%s'" % filepath
         else:
             _log.error("unknown input source type: %s", sourcefile)
             _log.fatal("can not do a copy to %s", filename)
@@ -855,11 +870,11 @@ if __name__ == "__main__":
     auto = False
     if opts.d:
         if not opts.dsc:
-            opts.dsc = os.path.join(opts.d, spec+".dsc")
+            opts.dsc = spec+".dsc"
         if not opts.diff:
-            opts.diff = os.path.join(opts.d, spec+".debian.diff.gz")
+            opts.diff = spec+".debian.diff.gz"
         if not opts.tar:
-            opts.tar = os.path.join(opts.d, spec+".orig.tar.gz")
+            opts.tar = spec+".orig.tar.gz"
         debtransform = False
         if not os.path.isdir(opts.d):
             os.mkdir(opts.d)
@@ -871,11 +886,11 @@ if __name__ == "__main__":
         opts.dsc = spec+".dsc"
         opts.diff = work.debian_file
         _log.log(HINT, "automatically selecting -o %s -f %s", opts.dsc, opts.diff)
-    if opts.diff:
-        _log.log(DONE, work.write_debian_diff(opts.diff))
-    if opts.dsc:
-        _log.log(DONE, work.write_debian_dsc(opts.dsc))
     if opts.tar:
-        _log.log(DONE, work.write_debian_orig_tar(opts.tar))
+        _log.log(DONE, work.write_debian_orig_tar(opts.tar, into = opts.d))
+    if opts.diff:
+        _log.log(DONE, work.write_debian_diff(opts.diff, into = opts.d))
+    if opts.dsc:
+        _log.log(DONE, work.write_debian_dsc(opts.dsc, into = opts.d))
     _log.info("converted %s packages from %s", len(work.packages), args)
 
