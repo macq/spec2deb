@@ -497,7 +497,7 @@ class RpmSpecToDebianControl:
         version = self.expand(self.var.get("version"))
         packager = self.expand(self.var.get("packager"))
         yield next+"debian/changelog"
-        yield "+%s (%s) %s; urgency=%s" % (name, version, distribution, urgency)
+        yield "+%s (%s) %s; urgency=%s" % (name, version, promote, urgency)
         yield "+"
         yield "+ * generated OBS deb build"
         yield "+"
@@ -760,6 +760,8 @@ _o.add_option("-D","--debian-dsc",action="count", help="output for the debian *.
 _o.add_option("-o","--dsc",metavar="FILE", help="create the debian.dsc descriptor file")
 _o.add_option("-f","--diff",metavar="FILE", help="""create the debian.diff.gz file 
 (depending on the given filename it can also be a debian.tar.gz with the same content)""")
+_o.add_option("-d", metavar="sources", help="""create and populate a debian sources
+directory. Automatically sets --dsc and --diff, creates an orig.tar.gz and assumes --no-debtransform""")
 
 if __name__ == "__main__":
     opts, args = _o.parse_args()
@@ -779,9 +781,9 @@ if __name__ == "__main__":
     if opts.debtransform:
         debtransform = True
     if opts.urgency:
-        urgency = urgency
-    if opts.distribution:
-        distribution = distribution
+        urgency = opts.urgency
+    if opts.promote:
+        promote = opts.promote 
     if opts.vars:
         done += opts.vars
         print "# have %s variables" % len(work.var)
@@ -831,7 +833,16 @@ if __name__ == "__main__":
         for line in work.debian_diff():
             print line
     auto = False
-    if not done and not opts.diff and not opts.dsc:
+    if opts.d:
+        if not opts.dsc:
+            opts.dsc = os.path.join(opts.d, spec+".dsc")
+        if not opts.diff:
+            opts.diff = os.path.join(opts.d, spec+".debian.diff.gz")
+        debtransform = False
+        if not os.path.isdir(opts.d):
+            os.mkdir(opts.d)
+        _log.warning("creating %s/%s*.orig.tar.gz not implemented yet", opts.d, spec)
+    elif not done and not opts.diff and not opts.dsc:
         auto = True
         work.debian_file = spec+".debian.diff.gz"
         if debtransform:
