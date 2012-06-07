@@ -17,6 +17,7 @@ import gzip
 import tarfile
 import tempfile
 import logging
+import commands
 
 _log = logging.getLogger(__name__)
 urgency = "low"
@@ -779,6 +780,8 @@ _o.add_option("-v","--verbose", action="count", help="show more runtime messages
 _o.add_option("-0","--quiet", action="count", help="show less runtime messages", default=0)
 _o.add_option("-1","--vars",action="count", help="show the variables after parsing")
 _o.add_option("-2","--packages",action="count", help="show the package settings after parsing")
+_o.add_option("-x","--extract", action="count", help="run dpkg-source -x after compiling")
+_o.add_option("-b","--build", action="count", help="run dpkg-source -b after compiling")
 _o.add_option("--no-debtransform",action="count", help="disable dependency on OBS debtransform")
 _o.add_option("--debtransform",action="count", help="enable dependency on OBS debtransform (%default)", default = debtransform)
 _o.add_option("--urgency", metavar=urgency, help="set urgency level for debian/changelog")
@@ -893,4 +896,22 @@ if __name__ == "__main__":
     if opts.dsc:
         _log.log(DONE, work.write_debian_dsc(opts.dsc, into = opts.d))
     _log.info("converted %s packages from %s", len(work.packages), args)
+    if opts.extract:
+        cmd = "cd %s && dpkg-source -x %s" % (opts.d or ".", opts.dsc)
+        _log.log(HINT, cmd)
+        status, output = commands.getstatusoutput(cmd)
+        if status:
+            _log.fatal("dpkg-source -x failed with %s#%s:\n%s", status>>8, status&255, output)
+        else:
+            _log.info("%s", output)
+    if opts.build:
+        cmd = "cd %s && dpkg-source -b %s" % (opts.d or ".", opts.dsc)
+        _log.log(HINT, cmd)
+        status, output = commands.getstatusoutput(cmd)
+        if status:
+            _log.fatal("dpkg-source -b failed with %s#%s:\n%s", status>>8, status&255, output)
+        else:
+            _log.info("%s", output)
+            
+        
 
