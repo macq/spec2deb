@@ -62,12 +62,18 @@ class RpmSpecToDebianControl:
         self.sectiontext = ""
         self.states = []
         self.var = { "_prefix" : "/usr",
-                     "_libdir" : "/usr/lib",
-                     "_includedir" : "/usr/include",
-                     "_bindir" : "/usr/bin",
-                     "_datadir" : "/usr/share",
-                     "_mandir" : "/usr/share/man",
-                     "_docdir" : "/usr/share/doc",
+                     "_libdir" : "%{_prefix}/lib",
+                     "_libexecdir" : "%{_prefix}/lib",
+                     "_includedir" : "%{_prefix}/include",
+                     "_bindir" : "%{_prefix}/bin",
+                     "_sbindir" : "%{_prefix}/sbin",
+                     "_datadir" : "%{_prefix}/share",
+                     "_mandir" : "%{_datadir}/man",
+                     "_docdir" : "%{_datadir}/doc",
+                     "_infodir" : "%{_datadir}/info",
+                     "_localstatedir" : "%{_prefix}/var",
+                     "_sharedstatedir" : "%{_prefix}/com",
+                     "_sysconfdir" : "/etc",
                    }
         self.commands = {
                         "%__make" : "$(MAKE)",
@@ -128,6 +134,41 @@ class RpmSpecToDebianControl:
     def save_setting(self, found_setting):
         name, value = found_setting.groups()
         self.append_setting(string.lower(name), value)
+    on_new_if = re.compile(r"%if\b(.*)")
+    on_end_if = re.compile(r"%endif\b(.*)")
+    def new_if(self, found_new_if):
+        condition, = found_new_if.groups()
+        if "debian" in condition:
+            self.states.append("keep-if")
+        else:
+            self.states.append("skip-if")
+    def end_if(self, found_new_if):
+        if self.states[-1] == "skip-if":
+            self.states = self.states[:-1]
+        elif self.states[-1] == "keep-if":
+            self.states = self.states[:-1]
+        else:
+            _log.error("unmatched %endif with no preceding %if")
+    def skip_if(self):
+        if "skip-if" in self.states:
+            return True
+        return False
+    on_default_var1 = re.compile(r"\s*%\{!\?(\w+):\s+%(define|global)\s+\1\b(.*)\}")
+    def default_var1(self, found_default_var):
+        name, typed, value = found_default_var.groups()
+        if name not in self.var:
+            self.var[name.strip()] = value.strip()
+        if typed != "global":
+            _log.warning("do not use %%define in default-variables, use %%global %s", name) 
+    on_default_var2 = re.compile(r"\s*[%][{][!][?](\w+)[:]\s*[%][{][?](\w+)[:]\s*[%](define|global)\s+\1\b(.*)[}][}]")
+    def default_var2(self, found_default_var):
+        name, name2, typed, value = found_default_var.groups()
+        if name2 not in self.var:
+            return
+        if name not in self.var:
+            self.var[name.strip()] = value.strip()
+        if typed != "global":
+            _log.warning("do not use %%define in default-variables, use %%global %s", name) 
     on_package = re.compile(r"%(package)(?:\s+(\S+))?(?:\s+(-.*))?")
     def start_package(self, found_package):
         rule, package, options = found_package.groups()
@@ -181,6 +222,10 @@ class RpmSpecToDebianControl:
         self.start_package(found_package)
         for line in open(rpmspec):
             if self.state() in [ "package" ]:
+                found_default_var1 = self.on_default_var1.match(line)
+                found_default_var2 = self.on_default_var2.match(line)
+                found_new_if = self.on_new_if.match(line)
+                found_end_if = self.on_end_if.match(line)
                 found_comment = self.on_comment.match(line)
                 found_variable = self.on_variable.match(line)
                 found_setting = self.on_setting.match(line)
@@ -192,6 +237,16 @@ class RpmSpecToDebianControl:
                 found_changelog = self.on_changelog.match(line)
                 if found_comment:
                     pass
+                elif found_default_var1:
+                    self.default_var1(found_default_var1)
+                elif found_default_var2:
+                    self.default_var2(found_default_var2)
+                elif found_new_if:
+                    self.new_if(found_new_if)
+                elif found_end_if:
+                    self.end_if(found_end_if)
+                elif self.skip_if():
+                    continue
                 elif found_variable:
                     self.save_variable(found_variable)
                 elif found_setting:
@@ -604,13 +659,15 @@ class RpmSpecToDebianControl:
         yield "+"
         for var, value in self.var.items():
             if var.startswith("_"):
-                yield "+%s=%s" % (var, value)
+                value2 = re.sub(r"[%][{](\w+)[}]", r"$(\1)", value)
+                yield "+%s=%s" % (var, value2)
         yield "+"
         yield "+configure: configure-stamp"
         yield "+configure-stamp:"
         yield "+\tdh_testdir"
         for line in self.deb_script("%prep"):
             yield "+\t"+line
+        yield "+\t#"
         yield "+\ttouch configure-stamp"
         yield "+"
         yield "+build: build-stamp"
@@ -618,6 +675,7 @@ class RpmSpecToDebianControl:
         yield "+\tdh_testdir"
         for line in self.deb_script("%build"):
             yield "+\t"+line
+        yield "+\t#"
         yield "+\ttouch build-stamp"
         yield "+"
         yield "+clean:"
@@ -670,7 +728,14 @@ class RpmSpecToDebianControl:
         script = self.packages["%{name}"].get(section, "")
         for lines in script:
             for line in lines.split("\n"):
-                if line.startswith("%setup"): continue
+                if line.startswith("%setup"): 
+                    continue
+                for _ in xrange(10):
+                    old = line
+                    line = re.sub("[%][{][?]_with[^{}]*[}]", "", line)
+                    line = re.sub("[%][{][!][?]_with[^{}]*[}]", "", line)
+                    if old == line:
+                        break
                 line = line.replace("%buildroot", "$(CURDIR)/debian/tmp")
                 line = line.replace("%{buildroot}", "$(CURDIR)/debian/tmp")
                 line = line.replace("$RPM_OPT_FLAGS", "$(CFLAGS)")
@@ -680,7 +745,8 @@ class RpmSpecToDebianControl:
                     line = line.replace(name, command)
                 for name in self.var.keys():
                     if name.startswith("_"):
-                        line = line.replace("%{"+name+"}", "$("+name+")")
+                        line = re.sub(r"[%%][{]%s[}]" % name, "$(%s)" % name, line)
+                        line = re.sub(r"[%%]%s\b" % name, "$(%s)" % name, line)
                 if line.strip() == "rm -rf $(CURDIR)/debian/tmp":
                     if section != "%clean":
                         _log.warning("found rm -rf %%buildroot in section %s (should only be in %%clean)", section)
