@@ -60,7 +60,7 @@ class RpmSpecToDebianControl:
         self.package = ""
         self.section = ""
         self.sectiontext = ""
-        self.state = ""
+        self.states = []
         self.var = { "_prefix" : "/usr",
                      "_libdir" : "/usr/lib",
                      "_includedir" : "/usr/include",
@@ -80,6 +80,10 @@ class RpmSpecToDebianControl:
         self.standards_version = standards_version
         self.format = FORMAT
         self.debtransform = debtransform
+    def state(self):
+        if not self.states:
+            return None
+        return self.states[0]
     def set_format(self, value):
         if not value:
             pass
@@ -89,7 +93,9 @@ class RpmSpecToDebianControl:
         else:
             _log.fatal("unknown source format: '%s'" % value)
     def new_state(self, state):
-        self.state = state
+        if not self.states:
+            self.states = [ "" ]
+        self.states[0] = state
     on_explicit_package = re.compile(r"-n\s+(\S+)")
     def new_package(self, package, options):
         package = package or ""
@@ -174,7 +180,7 @@ class RpmSpecToDebianControl:
         assert found_package
         self.start_package(found_package)
         for line in open(rpmspec):
-            if self.state in [ "package" ]:
+            if self.state() in [ "package" ]:
                 found_comment = self.on_comment.match(line)
                 found_variable = self.on_variable.match(line)
                 found_setting = self.on_setting.match(line)
@@ -205,8 +211,8 @@ class RpmSpecToDebianControl:
                 elif not line.strip():
                     pass
                 else:
-                    _log.error("%s unmatched line:\n %s", self.state, line)
-            elif self.state in [ "description"]:
+                    _log.error("%s unmatched line:\n %s", self.state(), line)
+            elif self.state() in [ "description"]:
                 found_package = self.on_package.match(line)
                 found_description = self.on_description.match(line)
                 found_rules = self.on_rules.match(line)
@@ -230,7 +236,7 @@ class RpmSpecToDebianControl:
                     self.start_changelog(found_changelog)
                 else:
                     self.append_section(line)
-            elif self.state in [ "rules" ]:
+            elif self.state() in [ "rules" ]:
                 found_package = self.on_package.match(line)
                 found_description = self.on_description.match(line)
                 found_rules = self.on_rules.match(line)
@@ -254,7 +260,7 @@ class RpmSpecToDebianControl:
                     self.start_changelog(found_changelog)
                 else:
                     self.append_section(line)
-            elif self.state in [ "scripts" ]:
+            elif self.state() in [ "scripts" ]:
                 found_package = self.on_package.match(line)
                 found_description = self.on_description.match(line)
                 found_rules = self.on_rules.match(line)
@@ -278,7 +284,7 @@ class RpmSpecToDebianControl:
                     self.start_changelog(found_changelog)
                 else:
                     self.append_section(line)
-            elif self.state in [ "files" ]:
+            elif self.state() in [ "files" ]:
                 found_package = self.on_package.match(line)
                 found_description = self.on_description.match(line)
                 found_rules = self.on_rules.match(line)
@@ -302,7 +308,7 @@ class RpmSpecToDebianControl:
                     self.start_changelog(found_changelog)
                 else:
                     self.append_section(line)
-            elif self.state in [ "changelog"]:
+            elif self.state() in [ "changelog"]:
                 found_package = self.on_package.match(line)
                 found_description = self.on_description.match(line)
                 found_rules = self.on_rules.match(line)
@@ -327,22 +333,22 @@ class RpmSpecToDebianControl:
                 else:
                     self.append_section(line)
             else:
-                _log.fatal("UNKNOWN state '%s'", self.state)
+                _log.fatal("UNKNOWN state %s", self.states)
         # for line
-        if self.state in [ "package"]:
+        if self.state() in [ "package"]:
             pass
-        elif self.state in [ "description" ]:
+        elif self.state() in [ "description" ]:
             self.endof_description()
-        elif self.state in [ "rules" ]:
+        elif self.state() in [ "rules" ]:
             self.endof_description()
-        elif self.state in [ "scripts" ]:
+        elif self.state() in [ "scripts" ]:
             self.endof_scripts()
-        elif self.state in [ "files" ]:
+        elif self.state() in [ "files" ]:
             self.endof_files()
-        elif self.state in [ "changelog" ]:
+        elif self.state() in [ "changelog" ]:
             self.endof_changelog()
         else:
-            _log.fatal("UNKNOWN state '%s' (at end of file)", self.state)
+            _log.fatal("UNKNOWN state %s (at end of file)", self.states)
     def package_mapping(self, package):
         known = { "zlib-dev" : "zlib1g-dev",
                   "sdl-dev" : "libsdl-dev",
