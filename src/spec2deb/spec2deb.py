@@ -735,7 +735,26 @@ class RpmSpecToDebianControl:
         finally:
             tar.close()
         return "ERROR", filename
-
+    def write_debian_orig_tar(self, filename):
+        sourcefile = self.expand(self.deb_sourcefile())
+        if sourcefile.endswith(".tar.gz"):
+            _log.info("copy %s to %s", sourcefile, filename)
+            import shutil
+            shutil.copyfile(sourcefile, filename)
+            return "written %s" % filename
+        elif sourcefile.endswith(".tar.bz2"):
+            _log.info("recompress %s to %s", sourcefile, filename)
+            import bz2
+            import gzip
+            gz = gzip.GzipFile(filename, "w")
+            bz = bz2.BZ2File(sourcefile, "r")
+            gz.write(bz.read())
+            gz.close()
+            bz.close()
+            return "written %s" % filename
+        else:
+            _log.error("unknown input source type: %s", sourcefile)
+            _log.fatal("can not do a copy to %s", filename)
 
 from optparse import OptionParser
 _hint = """NOTE: if neither -f nor -o is given (or any --debian-output) then 
@@ -757,6 +776,7 @@ _o.add_option("-R","--debian-rules",action="count", help="output for the debian/
 _o.add_option("-P","--debian-patches",action="count", help="output for the debian/patches/*")
 _o.add_option("-F","--debian-diff",action="count", help="output for the debian.diff combined file")
 _o.add_option("-D","--debian-dsc",action="count", help="output for the debian *.dsc descriptor")
+_o.add_option("-t","--tar",metavar="FILE", help="create an orig.tar.gz copy of rpm Source0")
 _o.add_option("-o","--dsc",metavar="FILE", help="create the debian.dsc descriptor file")
 _o.add_option("-f","--diff",metavar="FILE", help="""create the debian.diff.gz file 
 (depending on the given filename it can also be a debian.tar.gz with the same content)""")
@@ -838,10 +858,11 @@ if __name__ == "__main__":
             opts.dsc = os.path.join(opts.d, spec+".dsc")
         if not opts.diff:
             opts.diff = os.path.join(opts.d, spec+".debian.diff.gz")
+        if not opts.tar:
+            opts.tar = os.path.join(opts.d, spec+".orig.tar.gz")
         debtransform = False
         if not os.path.isdir(opts.d):
             os.mkdir(opts.d)
-        _log.warning("creating %s/%s*.orig.tar.gz not implemented yet", opts.d, spec)
     elif not done and not opts.diff and not opts.dsc:
         auto = True
         work.debian_file = spec+".debian.diff.gz"
@@ -854,5 +875,7 @@ if __name__ == "__main__":
         _log.log(DONE, work.write_debian_diff(opts.diff))
     if opts.dsc:
         _log.log(DONE, work.write_debian_dsc(opts.dsc))
+    if opts.tar:
+        _log.log(DONE, work.write_debian_orig_tar(opts.tar))
     _log.info("converted %s packages from %s", len(work.packages), args)
 
