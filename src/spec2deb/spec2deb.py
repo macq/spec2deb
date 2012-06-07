@@ -22,6 +22,7 @@ import commands
 _log = logging.getLogger(__name__)
 urgency = "low"
 promote = "unstable"
+standards_version = "3.8.2"
 
 debtransform = False
 if os.path.isdir(".osc"):
@@ -393,6 +394,8 @@ class RpmSpecToDebianControl:
         version = self.var.get("version","0")+"-"+self.var.get("revision","0")
         yield "+Version: %s" % version
         yield "+Maintainer: %s" % self.var.get("packager","?")
+        yield "+Standards-Version: %s" % standards_version
+        yield "+Homepage: %s" % self.var.get("url","")
         depends = list(self.deb_build_depends())
         yield "+Build-Depends: %s" % ", ".join(depends)
         source_file = self.expand(sourcefile)
@@ -457,6 +460,7 @@ class RpmSpecToDebianControl:
         yield "+Source: %s" % self.expand(source)
         depends = list(self.deb_build_depends())
         yield "+Build-Depends: %s" % ", ".join(depends)
+        yield "+Standards-Version: %s" % standards_version
         yield "+Homepage: %s" % self.var.get("url","")
         yield "+"
         for deb_package, package in sorted(self.deb_packages2()):
@@ -516,7 +520,7 @@ class RpmSpecToDebianControl:
         yield next+"debian/changelog"
         yield "+%s (%s) %s; urgency=%s" % (name, version, promote, urgency)
         yield "+"
-        yield "+ * generated OBS deb build"
+        yield "+  * generated OBS deb build"
         yield "+"
         yield "+ -- %s  Mon, 25 Dec 2007 10:50:38 +0100" % (packager)
     def debian_rules(self, next = NEXT):
@@ -912,7 +916,7 @@ if __name__ == "__main__":
         else:
             _log.info("%s", output)
     if opts.build:
-        cmd = "cd %s && dpkg-source -b %s" % (opts.d or ".", opts.dsc)
+        cmd = "cd %s && dpkg-source -b %s" % (opts.d or ".", work.deb_src())
         _log.log(HINT, cmd)
         status, output = commands.getstatusoutput(cmd)
         if status:
