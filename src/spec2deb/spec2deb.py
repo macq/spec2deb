@@ -20,7 +20,7 @@ import logging
 
 _log = logging.getLogger(__name__)
 urgency = "low"
-unstable = "stable"
+promote = "unstable"
 
 debtransform = False
 if os.path.isdir(".osc"):
@@ -745,8 +745,10 @@ _o.add_option("-v","--verbose", action="count", help="show more runtime messages
 _o.add_option("-0","--quiet", action="count", help="show less runtime messages", default=0)
 _o.add_option("-1","--vars",action="count", help="show the variables after parsing")
 _o.add_option("-2","--packages",action="count", help="show the package settings after parsing")
+_o.add_option("--no-debtransform",action="count", help="disable dependency on OBS debtransform")
+_o.add_option("--debtransform",action="count", help="enable dependency on OBS debtransform (%default)", default = debtransform)
 _o.add_option("--urgency", metavar=urgency, help="set urgency level for debian/changelog")
-_o.add_option("--unstable", metavar=unstable, help="set distribution level for debian/changelog")
+_o.add_option("--promote", metavar=promote, help="set distribution level for debian/changelog")
 _o.add_option("-C","--debian-control",action="count", help="output for the debian/control file")
 _o.add_option("-L","--debian-copyright",action="count", help="output for the debian/copyright file")
 _o.add_option("-I","--debian-install",action="count", help="output for the debian/*.install files")
@@ -758,8 +760,6 @@ _o.add_option("-D","--debian-dsc",action="count", help="output for the debian *.
 _o.add_option("-o","--dsc",metavar="FILE", help="create the debian.dsc descriptor file")
 _o.add_option("-f","--diff",metavar="FILE", help="""create the debian.diff.gz file 
 (depending on the given filename it can also be a debian.tar.gz with the same content)""")
-_o.add_option("--no-debtransform",action="count", help="disable dependency on OBS debtransform")
-_o.add_option("--debtransform",action="count", help="enable dependency on OBS debtransform (%default)", default = debtransform)
 
 if __name__ == "__main__":
     opts, args = _o.parse_args()
