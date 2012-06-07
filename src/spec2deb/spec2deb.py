@@ -73,6 +73,7 @@ class RpmSpecToDebianControl:
                         "%__make" : "$(MAKE)",
                         "%__rm" : "rm",
                         "%__mkdir_p" : "mkdir -p",
+                        "%__install" : "install",
                         }
         self.urgency = urgency
         self.promote = promote
@@ -664,10 +665,8 @@ class RpmSpecToDebianControl:
         for lines in script:
             for line in lines.split("\n"):
                 if line.startswith("%setup"): continue
-                line = line.replace("DESTDIR=%buildroot", "DESTDIR=$(CURDIR)/debian/tmp")
-                line = line.replace("DESTDIR=%{buildroot}", "DESTDIR=$(CURDIR)/debian/tmp")
-                line = line.replace("%buildroot", "$(CURDIR)")
-                line = line.replace("%{buildroot}", "$(CURDIR)")
+                line = line.replace("%buildroot", "$(CURDIR)/debian/tmp")
+                line = line.replace("%{buildroot}", "$(CURDIR)/debian/tmp")
                 line = line.replace("$RPM_OPT_FLAGS", "$(CFLAGS)")
                 line = line.replace("%{?jobs:-j%jobs}", "")
                 for name in self.commands:
@@ -676,10 +675,9 @@ class RpmSpecToDebianControl:
                 for name in self.var.keys():
                     if name.startswith("_"):
                         line = line.replace("%{"+name+"}", "$("+name+")")
-                if line.strip() == "rm -rf $(CURDIR)":
+                if line.strip() == "rm -rf $(CURDIR)/debian/tmp":
                     if section != "%clean":
-                        _log.warning("found rm -rf %%buildroot in section %s", section)
-                    line = ""
+                        _log.warning("found rm -rf %%buildroot in section %s (should only be in %%clean)", section)
                 if line.strip():
                     yield line
     def debian_patches(self, next = NEXT):
