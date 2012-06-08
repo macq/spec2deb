@@ -21,7 +21,7 @@
      %{!?variable: %define variable value}
      %{!?variable: %global variable value}
      %{!?variable: %{?other: %define variable value}}
-     %{!?variable: %{?other: %define variable value}}
+     %{!?variable: %{?other: %global variable value}}
    * %setup and %setup -n other-dir
      will make the script to know that there will be subdirectory in the
      tarball either named "%{name}-%{version}" or whatever value was given
