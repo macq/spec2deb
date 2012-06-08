@@ -49,3 +49,6 @@ Get a source snapshot from one of the tags at Bitbucket:
 Examples for existing DEBs converted from RPMs can be seen in:   
 <https://build.opensuse.org/package/show?project=home:guidod>
 
+## Documentation ##
+
+There is additional documentation in the README.TXT in the project sources.
