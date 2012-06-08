@@ -44,7 +44,8 @@
      first Source:-file will be unpacked - all the other source-files will
      be converted into patches. So they should better be plain text files.
    * The Patch:-files are pushed to the debian/series of course that will
-     also specify the order of applying patches. (TODO)- 
+     also specify the order of applying patches. (derived from the occurrences
+     of the %patch-macro in the %setup section of the rpm spec (TODO)). 
      
 ## FORMATS ##
 
