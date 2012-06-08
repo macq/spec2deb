@@ -18,6 +18,8 @@ import tarfile
 import tempfile
 import logging
 import commands
+import glob
+import sys
 
 _log = logging.getLogger(__name__)
 urgency = "low"
@@ -594,24 +596,28 @@ class RpmSpecToDebianControl:
                 for filespec in files.split("\n"):
                     path = self.expand(filespec.strip())
                     if path.startswith("%config"):
-                        path = path[len("%config"):]
+                        path = path[len("%config"):].strip()
                         if path.startswith("/"):
                             path = path[1:]
-                        files_list.append(path.strip())
+                        if path:
+                            files_list.append(path)
                     elif path.startswith("%doc"):
                         continue
                     elif path.startswith("%dir"):
-                        path = path[len("%dir"):]
+                        path = path[len("%dir"):].strip()
                         if path.startswith("/"):
                             path = path[1:]
-                        dirs_list.append(path.strip())
+                        if path:
+                            dirs_list.append(path)
                         continue
                     elif path.startswith("%defattr"):
                         continue
                     else:
+                        path = path.strip()
                         if path.startswith("/"):
                             path = path[1:]
-                        files_list.append(path.strip())
+                        if path:
+                            files_list.append(path)
                         continue
             if dirs_list:
                 yield next+dirs_name
@@ -951,6 +957,23 @@ if __name__ == "__main__":
     work = RpmSpecToDebianControl()
     work.set_format(opts.format)
     spec = None
+    if not args:
+        specs = glob.glob("*.spec")
+        if len(specs) == 1:
+            args = specs
+            _log.log(HINT, "no file arguments given but '%s' found to be the only *.spec here.", specs[0])
+        elif len(specs) > 1:
+            _o.print_help()
+            _log.warning("")
+            _log.warning("no file arguments given and multiple *.spec files in the current directory:")
+            _log.warning(" %s", specs)
+            sys.exit(1) # nothing was done
+        else:
+            _o.print_help()
+            _log.warning("")
+            _log.warning("no file arguments given and no *.spec files in the current directory.")
+            _log.warning("")
+            sys.exit(1) # nothing was done
     for arg in args:
         work.parse(arg)
         if arg.endswith(".spec"):
