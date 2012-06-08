@@ -86,8 +86,30 @@
    
    * spec2deb.py mypackage.spec -d sources -x -b
    
+## OBS TESTING ##
+
+   Note that if "spec2deb.py" is called without any options at all ... and 
+   there is an ".osc" subdirectory then the DEBFORMAT is chosen. Also all 
+   debian files are generated to the local directory which is then ready 
+   for "osc commit". That commit will trigger a Debian build of the associated 
+   OBS project at build.opensuse.org. 
    
+   So the command line options are basically optimized for that usage: after 
+   having a change on the rpm parts of an OBS project you can easily regenerate
+   the associated DEB build info (package.dsc, debian.tar.gz) by just typing
+   
+   * spec2deb.py
        
-        
-      
-   
+   The script will check the current directory for an *.spec file in that case
+   and if exactly one is found then it is used the first argument that would
+   otherwise be required. Of course ... in some sophisticated OBS RPM project
+   there may be multiple *.spec files optimizing for different build targets.
+
+   But again: spec2deb shall help you with the normal and not that overly 
+   complex case. Try to keep the differences of each build target in one
+   *.spec file with %if-%endif being your friend to care for the differing
+   names of the build-dependency package names (as each distro has another
+   naming policy to follow). Using %if.*debian you can even add some extra
+   spec hints for the debian build targets (although the spec is never being
+   executed for those - just the spec2deb generated *.dsc and debian/rules).
+     
