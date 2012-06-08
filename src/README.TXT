@@ -51,10 +51,13 @@
      that it will take a debian.tar.gz as input (NO package prefix!) in order
      to generate a FORMAT 1.0 diff.gz on the build server.
       
-   You can also explicitly specify a "-f debian.tar.gz" for a FORMAT 3.0 
+   You can also explicitly specify a "-f debian.tar.gz" for a FORMAT 1.0 
    target but it is simply not the default. The spec2deb script handles all
    the extra debian/files internally as patches that will only be converted
-   to tar entries if you want it to be done that way.
+   to tar entries if you want it to be done that way. The default is the
+   FOMRAT 1.0 of course - you can change that with:
+   
+   * spec2deb.py --format=3 --no-debtransform mypackage.spec
    
 ## TESTING ##
 
