@@ -366,6 +366,8 @@ class RpmSpecToDebianControl:
                 else:
                     _log.error("%s unmatched line:\n %s", self.state(), line)
             elif self.state() in [ "description"]:
+                found_new_if = self.on_new_if.match(line)
+                found_end_if = self.on_end_if.match(line)
                 found_package = self.on_package.match(line)
                 found_description = self.on_description.match(line)
                 found_rules = self.on_rules.match(line)
@@ -375,7 +377,13 @@ class RpmSpecToDebianControl:
                 if (found_package or found_description or found_rules or found_scripts 
                         or found_files or found_changelog):
                     self.endof_description()
-                if found_package:
+                if found_new_if:
+                    self.new_if(found_new_if)
+                elif found_end_if:
+                    self.end_if(found_end_if)
+                elif self.skip_if():
+                    continue
+                elif found_package:
                     self.start_package(found_package)
                 elif found_description:
                     self.start_description(found_description)
@@ -390,6 +398,8 @@ class RpmSpecToDebianControl:
                 else:
                     self.append_section(line)
             elif self.state() in [ "rules" ]:
+                found_new_if = self.on_new_if.match(line)
+                found_end_if = self.on_end_if.match(line)
                 found_package = self.on_package.match(line)
                 found_description = self.on_description.match(line)
                 found_rules = self.on_rules.match(line)
@@ -399,7 +409,13 @@ class RpmSpecToDebianControl:
                 if (found_package or found_description or found_rules or found_scripts 
                         or found_files or found_changelog):
                     self.endof_files()
-                if found_package:
+                if found_new_if:
+                    self.new_if(found_new_if)
+                elif found_end_if:
+                    self.end_if(found_end_if)
+                elif self.skip_if():
+                    continue
+                elif found_package:
                     self.start_package(found_package)
                 elif found_description:
                     self.start_description(found_description)
@@ -414,6 +430,8 @@ class RpmSpecToDebianControl:
                 else:
                     self.append_section(line)
             elif self.state() in [ "scripts" ]:
+                found_new_if = self.on_new_if.match(line)
+                found_end_if = self.on_end_if.match(line)
                 found_package = self.on_package.match(line)
                 found_description = self.on_description.match(line)
                 found_rules = self.on_rules.match(line)
@@ -423,7 +441,13 @@ class RpmSpecToDebianControl:
                 if (found_package or found_description or found_rules or found_scripts 
                         or found_files or found_changelog):
                     self.endof_scripts()
-                if found_package:
+                if found_new_if:
+                    self.new_if(found_new_if)
+                elif found_end_if:
+                    self.end_if(found_end_if)
+                elif self.skip_if():
+                    continue
+                elif found_package:
                     self.start_package(found_package)
                 elif found_description:
                     self.start_description(found_description)
@@ -438,6 +462,8 @@ class RpmSpecToDebianControl:
                 else:
                     self.append_section(line)
             elif self.state() in [ "files" ]:
+                found_new_if = self.on_new_if.match(line)
+                found_end_if = self.on_end_if.match(line)
                 found_package = self.on_package.match(line)
                 found_description = self.on_description.match(line)
                 found_rules = self.on_rules.match(line)
@@ -447,7 +473,13 @@ class RpmSpecToDebianControl:
                 if (found_package or found_description or found_rules or found_scripts 
                         or found_files or found_changelog):
                     self.endof_files()
-                if found_package:
+                if found_new_if:
+                    self.new_if(found_new_if)
+                elif found_end_if:
+                    self.end_if(found_end_if)
+                elif self.skip_if():
+                    continue
+                elif found_package:
                     self.start_package(found_package)
                 elif found_description:
                     self.start_description(found_description)
@@ -488,12 +520,15 @@ class RpmSpecToDebianControl:
             else:
                 _log.fatal("UNKNOWN state %s", self.states)
         # for line
+        if self.skip_if():
+            self.error("end of while in skip-if section")
+            pass
         if self.state() in [ "package"]:
             pass
         elif self.state() in [ "description" ]:
             self.endof_description()
         elif self.state() in [ "rules" ]:
-            self.endof_description()
+            self.endof_rules()
         elif self.state() in [ "scripts" ]:
             self.endof_scripts()
         elif self.state() in [ "files" ]:
