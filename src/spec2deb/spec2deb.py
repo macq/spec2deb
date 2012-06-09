@@ -680,7 +680,7 @@ class RpmSpecToDebianControl:
         yield "+Binary: %s" % ", ".join(binaries)
         yield "+Architecture: %s" % package_architecture
         yield "+Version: %s" % self.deb_revision()
-        yield "+Maintainer: %s" % self.get("packager","?")
+        yield "+Maintainer: %s" % self.get("packager", default_rpm_packager)
         yield "+Standards-Version: %s" % self.standards_version
         yield "+Homepage: %s" % self.get("url","")
         depends = list(self.deb_build_depends())
