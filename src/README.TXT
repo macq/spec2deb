@@ -132,3 +132,28 @@
    spec hints for the debian build targets (although the spec is never being
    executed for those - just the spec2deb generated *.dsc and debian/rules).
      
+## TODO for 1.0 ##
+
+* rewrite debian/rules $(variable)-handling
+** only emit global variables when they have been used in any deb_script
+** based on usage, do not differentiate between "_"+global and other var 
+** recognize "export var=" in a build-script and convert the shell-var
+   into a make-var emitting them on the global section if possible
+* rewrite debian/rules multiline-handling
+** currently uses conversion of one shell-line into one make-line
+** recognize atleast shell if-else-fi constructs spanning multiple lines
+   to be assembled to one make-line (with breaks of the "\\\n;"-style).
+* more testing with real installations.
+   
+## WISHLIST for 1.1+ ##
+
+* fixup postinst/prerm scripts to do the right thing when called with
+  something unknown from rpm, e.g. the "abort-install" mode of postinst
+  might be mapped to the %postun script that needs to be added (with if-else).
+* shell-vars that can not be pushed to be make-vars
+* possible option that the rpm build shell-script is not converted to be a
+  make build snippet but it is left as a shell-script that is called from
+  debian/rules (with a series of shell-variables being preset)
+** even more, autodetect the cases where the script is simple (converting
+  to a debian/rules make-snippet) or complex (calling extra scripts then).
+  
