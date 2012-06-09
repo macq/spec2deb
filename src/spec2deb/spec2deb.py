@@ -503,17 +503,15 @@ class RpmSpecToDebianControl:
             self.endof_changelog()
         else:
             _log.fatal("UNKNOWN state %s (at end of file)", self.states)
-    on_var1 = re.compile(r"%(\w+)\b")
-    on_var2 = re.compile(r"%{(\w+)}")
+    on_embedded_name = re.compile(r"[%](\w+)\b")
+    on_required_name = re.compile(r"[%][{](\w+)[}]")
+    on_optional_name = re.compile(r"[%][{][?](\w+)[}]")
     def expand(self, text):
         orig = text
-        on_plain_name = re.compile(r"[%](\w+)\b")
-        on_required_name = re.compile(r"[%][{](\w+)[}]")
-        on_optional_name = re.compile(r"[%][{][?](\w+)[}]")
         for _ in xrange(100):
             oldtext = text
             text = text.replace("%%", "\1")
-            for found in on_plain_name.finditer(text):
+            for found in self.on_embedded_name.finditer(text):
                 name, = found.groups()
                 if self.has(name):
                     value = self.get(name)
@@ -521,7 +519,7 @@ class RpmSpecToDebianControl:
                 else:
                     _log.error("unable to expand %%%s in:\n %s\n %s", name, orig, text)
             text = text.replace("%%", "\1")
-            for found in on_required_name.finditer(text):
+            for found in self.on_required_name.finditer(text):
                 name, = found.groups()
                 if self.has(name):
                     value = self.get(name)
@@ -529,7 +527,7 @@ class RpmSpecToDebianControl:
                 else:
                     _log.error("unable to expand %%{%s} in:\n %s\n %s", name, orig, text)
             text = text.replace("%%", "\1")
-            for found in on_optional_name.finditer(text):
+            for found in self.on_optional_name.finditer(text):
                 name, = found.groups()
                 if self.has(name):
                     value = ''
