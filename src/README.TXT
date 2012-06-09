@@ -37,15 +37,21 @@
      other values get the value that they are being set to in the rpm spec 
      or the rpm macros default (although only a part of them have been added).
      
-  What it can NOT do:
+  What it can ALMOST do:
   
    * Multiple Source:-files. Or more specifically ... more than one source 
      tarball that needs to be unpacked in the build sources area. Only the
      first Source:-file will be unpacked - all the other source-files will
      be converted into patches. So they should better be plain text files.
    * The Patch:-files are pushed to the debian/series of course that will
-     also specify the order of applying patches. (derived from the occurrences
-     of the %patch-macro in the %setup section of the rpm spec (TODO)). 
+     also specify the order of applying patches. The current order is taken
+     from the number if the declaration, i.e. it is not the order of
+     appearance in in the %setup section (that would be a TODO then).
+   * The postinst/prerm scripts are converted and there is a header section
+     that maps "install/upgrade" to the "$1" 0/1/2 style of rpm scripts. But
+     the debian style has more steps and modes which are NOT covered correctly. 
+     So you should keep your "maintainer scripts" rather simple so that it
+     can get away with being called multiple times during install/remove. 
      
 ## FORMATS ##
 
