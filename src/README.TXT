@@ -36,13 +36,12 @@
      and %_make will always be $(MAKE). Those are exceptions however as all
      other values get the value that they are being set to in the rpm spec 
      or the rpm macros default (although only a part of them have been added).
+   * Multiple Source:-files. However you should be aware that only the first
+     Source0 tarball is unpacked. All the others are copied as is and it is
+     better to have them as plain textfiles (included into debian.diff.gz).
      
   What it can ALMOST do:
   
-   * Multiple Source:-files. Or more specifically ... more than one source 
-     tarball that needs to be unpacked in the build sources area. Only the
-     first Source:-file will be unpacked - all the other source-files will
-     be converted into patches. So they should better be plain text files.
    * The Patch:-files are pushed to the debian/series of course that will
      also specify the order of applying patches. The current order is taken
      from the number in the declaration header, i.e. it is not the order of
