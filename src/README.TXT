@@ -63,7 +63,7 @@
    * FORMAT 3.0 - this will generate a package-version.debian.tar.gz instead
      of a diff.gz. The dpkg-source will unpack it thereby creating again the 
      extra package/debian/files in the source area of the build.
-   * DEBFORMAT - for OBS (Opensuse Buildsystem) which has the peculiarity
+   * DEBTRANSFORM - for OBS (Opensuse Buildsystem) which has the peculiarity
      that it will take a debian.tar.gz as input (NO package prefix!) in order
      to generate a FORMAT 1.0 diff.gz on the build server.
       
@@ -83,7 +83,7 @@
    the spec2deb run.  
    
    Note however that in this case the original tarball is not converted. This
-   fine for the DEBFORMAT case which will do the conversion when copying the 
+   fine for the DEBTRANSFORM case which will do the conversion when copying the 
    input to the build server anyway. It is also okay if you do have a tarball 
    in the directory that is named "package_version.orig.tar.gz" because that 
    name format is strictly required by dpkg-source. However it is very 
@@ -108,7 +108,7 @@
 ## OBS TESTING ##
 
    Note that if "spec2deb.py" is called without any options at all ... and 
-   there is an ".osc" subdirectory then the DEBFORMAT is chosen. Also all 
+   there is an ".osc" subdirectory then the DEBTRANSFORM is chosen. Also all 
    debian files are generated to the local directory which is then ready 
    for "osc commit". That commit will trigger a Debian build of the associated 
    OBS project at build.opensuse.org. 
