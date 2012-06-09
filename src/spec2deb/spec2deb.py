@@ -84,7 +84,9 @@ usr_lib_rpm_macros = """# copy-n-paste from /usr/lib/rpm/macros
 %_includedir            %{_prefix}/include
 %_infodir               %{_datadir}/info
 %_mandir                %{_datadir}/man
+
 %_tmppath               %{_var}/tmp
+%_docdir                %{_datadir}/doc
 """
 
 debian_special_macros = """
