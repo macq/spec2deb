@@ -135,6 +135,8 @@ class RpmSpecToDebianControl:
         self.scan_macros(usr_lib_rpm_macros, "default")
         self.scan_macros(debian_special_macros, "debian")
         self.cache_packages2 = []
+        self.cache_version = None
+        self.cache_revision = None
     def has_names(self):
         return self.var.keys()
     def has(self, name):
@@ -643,8 +645,6 @@ class RpmSpecToDebianControl:
         if x:
             sourcefile = sourcefile[x+1:]
         return sourcefile
-    def deb_version(self):
-        return self.get("version","")
     def deb_source(self, sourcefile = None):
         return self.get("name")
     def deb_src(self):
@@ -657,6 +657,19 @@ class RpmSpecToDebianControl:
                         return m.group(1)
                     return self.deb_source()+"-"+self.deb_version()
         _log.error("no %setup in %prep section found")
+    def deb_version(self):
+        if self.cache_version is None: 
+            value = self.get("version","0")
+            self.cache_version = self.expand(value)
+        return self.cache_version
+    def deb_revision(self):
+        if self.cache_revision is None:
+            release = self.get("release","0")
+            dot = release.find(".")
+            if dot > 0: release = release[:dot]
+            value = self.deb_version()+"-"+release
+            self.cache_revision = self.expand(value)
+        return self.cache_revision
     def debian_dsc(self, nextfile = _nextfile, into = None):
         yield nextfile+"debian/dsc"
         yield "+Format: %s" % self.source_format
@@ -666,8 +679,7 @@ class RpmSpecToDebianControl:
         binaries = list(self.deb_packages())
         yield "+Binary: %s" % ", ".join(binaries)
         yield "+Architecture: %s" % package_architecture
-        version = self.get("version","0")+"-"+self.get("revision","0")
-        yield "+Version: %s" % version
+        yield "+Version: %s" % self.deb_revision()
         yield "+Maintainer: %s" % self.get("packager","?")
         yield "+Standards-Version: %s" % self.standards_version
         yield "+Homepage: %s" % self.get("url","")
@@ -829,8 +841,8 @@ class RpmSpecToDebianControl:
                         yield "+"+path
     def debian_changelog(self, nextfile = _nextfile):
         name = self.expand(self.get("name"))
-        version = self.expand(self.get("version"))
-        packager = self.expand(self.get("packager"))
+        version = self.expand(self.deb_revision())
+        packager = self.expand(self.get("packager", default_rpm_packager))
         promote = self.promote
         urgency = self.urgency
         yield nextfile+"debian/changelog"
@@ -1368,9 +1380,9 @@ if __name__ == "__main__":
             opts.dsc = spec+".dsc"
         if not opts.diff:
             if "3." in work.source_format:
-                opts.diff = "%s_%s-0.debian.tar.gz" % (work.deb_source(), work.deb_version())
+                opts.diff = "%s_%s.debian.tar.gz" % (work.deb_source(), work.deb_revision())
             else:
-                opts.diff = "%s_%s-0.diff.gz" % (work.deb_source(), work.deb_version())
+                opts.diff = "%s_%s.diff.gz" % (work.deb_source(), work.deb_revision())
         if not opts.tar:
             opts.tar = "%s_%s.orig.tar.gz" % (work.deb_source(), work.deb_version())
         work.debtransform = False
