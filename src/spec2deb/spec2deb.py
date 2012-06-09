@@ -42,8 +42,8 @@ if os.path.isdir(".osc"):
 #       and run them in your sources directory (*tar, *.spec,*.dsc) 
 #       (rm -rf x; mkdir x; debtransform . *.dsc x/; cd x; dpkg-source -x *.dsc)
 
-NEXT = "--- "
 FORMAT = "1.0" # "2.0" # "3.0 (quilt)" # 
+_nextfile = "--- " # mark the start of the next file during diff generation
 
 _formats = { 
     "1" : "1.0", 
@@ -267,7 +267,7 @@ class RpmSpecToDebianControl:
             _log.warning("do not use %%define in default-variables, use %%global %s", name) 
     on_package = re.compile(r"%(package)(?:\s+(\S+))?(?:\s+(-.*))?")
     def start_package(self, found_package):
-        rule, package, options = found_package.groups()
+        _, package, options = found_package.groups()
         self.new_package(package, options)
         self.new_state("package")
     on_description = re.compile(r"%(description)(?:\s+(\S+))?(?:\s+(-.*))?")
@@ -543,7 +543,7 @@ class RpmSpecToDebianControl:
             _log.warning("expand of '%s' left a make variable:\n %s", orig, text)
         return text
     def deb_packages(self):
-        for deb, pkg in self.deb_packages2():
+        for deb, _ in self.deb_packages2():
             yield deb
     def deb_packages2(self):
         for package in sorted(self.packages):
@@ -587,8 +587,8 @@ class RpmSpecToDebianControl:
                         return m.group(1)
                     return self.deb_source()+"-"+self.deb_version()
         _log.error("no %setup in %prep section found")
-    def debian_dsc(self, next = NEXT, into = None):
-        yield next+"debian/dsc"
+    def debian_dsc(self, nextfile = _nextfile, into = None):
+        yield nextfile+"debian/dsc"
         yield "+Format: %s" % self.format
         sourcefile = self.deb_sourcefile()
         source = self.deb_source(sourcefile)
@@ -655,8 +655,8 @@ class RpmSpecToDebianControl:
             else:
                 yield prefix+" "+line
             prefix = ""
-    def debian_control(self, next = NEXT):
-        yield next+"debian/control"
+    def debian_control(self, nextfile = _nextfile):
+        yield nextfile+"debian/control"
         group = self.get("group","System/Libraries")
         section = self.group2section(group)
         yield "+Priority: %s" % "optional"
@@ -695,10 +695,10 @@ class RpmSpecToDebianControl:
             for line in self.deb_description_lines(text):
                 yield "+"+line
             yield "+"
-    def debian_copyright(self, next = NEXT):
-        yield next+"debian/copyright"
+    def debian_copyright(self, nextfile = _nextfile):
+        yield nextfile+"debian/copyright"
         yield "+License: %s" % self.get("license","")
-    def debian_install(self, next = NEXT):
+    def debian_install(self, nextfile = _nextfile):
         docs = []
         for deb_package, package in sorted(self.deb_packages2()):
             files_name =  "debian/%s.install" % deb_package
@@ -733,41 +733,41 @@ class RpmSpecToDebianControl:
                             files_list.append(path)
                         continue
             if dirs_list:
-                yield next+dirs_name
+                yield nextfile+dirs_name
                 for path in dirs_list:
                     path = self.expand(path)
                     if path.startswith("/"):
                         path = path[1:]
                     yield "+"+path
             if files_list:
-                yield next+files_name
+                yield nextfile+files_name
                 for path in files_list:
                     path = self.expand(path)
                     if path.startswith("/"):
                         path = path[1:]
                     yield "+"+path
         if docs:
-            yield next+"docs"
+            yield nextfile+"docs"
             for path in docs:
                 if True:
                     path = self.expand(path)
                     if path.startswith("/"):
                         path = path[1:]
                     yield "+"+path
-    def debian_changelog(self, next = NEXT):
+    def debian_changelog(self, nextfile = _nextfile):
         name = self.expand(self.get("name"))
         version = self.expand(self.get("version"))
         packager = self.expand(self.get("packager"))
         promote = self.promote
         urgency = self.urgency
-        yield next+"debian/changelog"
+        yield nextfile+"debian/changelog"
         yield "+%s (%s) %s; urgency=%s" % (name, version, promote, urgency)
         yield "+"
         yield "+  * generated OBS deb build"
         yield "+"
         yield "+ -- %s  Mon, 25 Dec 2007 10:50:38 +0100" % (packager)
-    def debian_rules(self, next = NEXT):
-        yield next+"debian/rules"
+    def debian_rules(self, nextfile = _nextfile):
+        yield nextfile+"debian/rules"
         yield "+#!/usr/bin/make -f"
         yield "+# -*- makefile -*-"
         yield "+# Uncomment this to turn on verbose mode."
@@ -907,7 +907,7 @@ class RpmSpecToDebianControl:
                         _log.warning("found rm -rf %%buildroot in section %s (should only be in %%clean)", section)
                 if line.strip():
                     yield line
-    def debian_scripts(self, next = NEXT):
+    def debian_scripts(self, nextfile = _nextfile):
         preinst = """
         if   [ "install" = "$1" ]; then  shift ; set -- "0" "$@"
         elif [ "update" = "$1" ]; then   shift ; set -- "1" "$@"
@@ -939,9 +939,9 @@ class RpmSpecToDebianControl:
                     ("prerm", "%preun"), ("postrm","%postun")] 
         for deb_package, package in sorted(self.deb_packages2()):
             for deb_section, section in sections:
-                scripts = self.packages["%{name}"].get(section, "")
+                scripts = self.packages[package].get(section, "")
                 if scripts:
-                    yield next+"%s.%s" %(deb_package, deb_section)
+                    yield nextfile+"%s.%s" %(deb_package, deb_section)
                     yield "+#! /bin/sh"
                     for line in mapped[deb_section].split("\n"):
                         if line.strip():
@@ -952,7 +952,7 @@ class RpmSpecToDebianControl:
                     for script in scripts:
                         for line in script.split("\n"):
                             yield "+"+self.expand(line)
-    def debian_patches(self, next = NEXT):
+    def debian_patches(self, nextfile = _nextfile):
         patches = []
         for n in xrange(1,100):
             source = self.get("source%i" % n)
@@ -960,7 +960,7 @@ class RpmSpecToDebianControl:
                 try:
                     _log.debug("append source%i '%s' as a patch", n, source)
                     textfile = open(source)
-                    yield next+source
+                    yield nextfile+source
                     for line in textfile:
                         yield "+"+line
                     textfile.close()
@@ -975,16 +975,16 @@ class RpmSpecToDebianControl:
             if patch:
                 patches.append(patch)
         if patches:
-            yield next+"debian/patches/series"
+            yield nextfile+"debian/patches/series"
             for patch in patches:
                 yield "+"+patch
             for patch in patches:
-                yield next+"debian/patches/"+patch
+                yield nextfile+"debian/patches/"+patch
                 for line in open(patch):
                     yield "+"+line
         else:
             _log.info("no patches -> no debian/patches/series")
-        yield next+"debian/source/format"
+        yield nextfile+"debian/source/format"
         yield "+"+self.format
     def p(self, subdir, patch):
         if "3." in self.format or self.debtransform:
@@ -999,11 +999,11 @@ class RpmSpecToDebianControl:
             old = src+".orig"
             patch = None
             lines = []
-            for line in deb(NEXT):
+            for line in deb(_nextfile):
                 if isinstance(line, tuple):
                     _log.fatal("?? %s %s", deb, line)
                     line = " ".join(line)
-                if line.startswith(NEXT):
+                if line.startswith(_nextfile):
                     if patch:
                         yield "--- %s" % self.p(old, patch)
                         yield "+++ %s" % self.p(src, patch)
@@ -1011,7 +1011,7 @@ class RpmSpecToDebianControl:
                         for plus in lines:
                             yield plus
                     lines = []
-                    patch = line[len(NEXT):]
+                    patch = line[len(_nextfile):]
                 else:
                     lines += [ line ]
             # end of deb
@@ -1031,7 +1031,7 @@ class RpmSpecToDebianControl:
         try:
             count = 0
             for line in self.debian_dsc(into = into):
-                if line.startswith(NEXT):
+                if line.startswith(_nextfile):
                     continue
                 f.write(line[1:]+"\n")
                 count +=1
@@ -1115,8 +1115,7 @@ class RpmSpecToDebianControl:
             return "written '%s'" % filepath
         elif sourcefile.endswith(".tar.bz2"):
             _log.info("recompress %s to %s", sourcefile, filename)
-            import bz2
-            import gzip
+            import bz2 #@UnresolvedImport
             gz = gzip.GzipFile(filepath, "w")
             bz = bz2.BZ2File(sourcefile, "r")
             gz.write(bz.read())
