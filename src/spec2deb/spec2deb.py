@@ -90,6 +90,10 @@ usr_lib_rpm_macros = """# copy-n-paste from /usr/lib/rpm/macros
 debian_special_macros = """
 %__make                 $(MAKE)
 %buildroot              $(CURDIR)/debian/tmp
+%host                   $(DEB_HOST_GNU_TYPE)
+%host_alias             $(DEB_HOST_GNU_TYPE)
+%build                  $(DEB_BUILD_GNU_TYPE)
+%build_alias            $(DEB_BUILD_GNU_TYPE)
 """
 
 class RpmSpecToDebianControl:
@@ -109,8 +113,8 @@ class RpmSpecToDebianControl:
         self.standards_version = standards_version
         self.format = FORMAT
         self.debtransform = debtransform
-        self.scan_macros(usr_lib_rpm_macros, "macros")
-        self.scan_macros(debian_special_macros, "fixed")
+        self.scan_macros(usr_lib_rpm_macros, "default")
+        self.scan_macros(debian_special_macros, "debian")
     def has_names(self):
         return self.var.keys()
     def has(self, name):
@@ -184,8 +188,8 @@ class RpmSpecToDebianControl:
                     name1 += "0"
                     name2 += "0"
                 if name1 not in ignores:
-                    self.set(name1, value.strip(), "setting")
-                    self.set(name2, value.strip(), "setting")
+                    self.set(name1, value.strip(), "package")
+                    self.set(name2, value.strip(), "package")
             else:
                 _log.debug("ignored to add a setting '%s'", name)
         else:
@@ -1124,8 +1128,9 @@ if __name__ == "__main__":
     if opts.vars:
         done += opts.vars
         print "# have %s variables" % len(work.var)
-        for name in sorted(work.var):
-            print " %s='%s'" % (name, work.var[name])
+        for name in sorted(work.has_names()):
+            typed = work.typed[name]
+            print "%%%s %s %s" % (typed, name, work.get(name))
     else:
         _log.log(HINT, "have %s variables (use -1 to show them)" % len(work.var))
     if opts.packages:
