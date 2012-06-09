@@ -890,7 +890,7 @@ class RpmSpecToDebianControl:
         on_ifelse_then = re.compile(r".*;\s*then\s*$")
         on_ifelse_else = re.compile(r"\s*else\s*$|.*;\s*else\s*$")
         on_ifelse_ends = re.compile(r"\s*fi\s*$|.*;\s*fi\s*$")
-        ifelse = False
+        ifelse = 0
         for lines in script:
             for line in lines.split("\n"):
                 if line.startswith("%setup"): 
@@ -943,16 +943,16 @@ class RpmSpecToDebianControl:
                 found_ifelse_ends = on_ifelse_ends.match(line)
                 if found_ifelse_if and not found_ifelse_then:
                     _log.error("'if'-line without '; then' -> not supported\n %s", line)
-                    ifelse = True
+                    ifelse += 1
                 elif found_ifelse_then:
                     line = line + " \\"
-                    ifelse = True
+                    ifelse += 1
                 elif found_ifelse_else:
                     line = line + " \\"
                     if not ifelse:
                         _log.error("'else' outside ';then'-block")
                 elif found_ifelse_ends:
-                    ifelse = False
+                    ifelse += -1
                 elif ifelse:
                     if not line.strip().endswith("\\"):
                         line += "; \\"
