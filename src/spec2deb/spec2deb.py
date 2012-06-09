@@ -722,10 +722,76 @@ class RpmSpecToDebianControl:
         md5.update(open(filename).read())
         return md5.hexdigest()
     def group2section(self, group):
+        # there are 3 areas ("main", "contrib", "non-free") with multiple 
+        # sections. http://packages.debian.org/unstable/ has a list of all
+        # sections that are currently used. - For Opensuse the current group 
+        # list is at http://en.opensuse.org/openSUSE:Package_group_guidelines
+        debian = { 
+            "admin" : [],
+            "cli-mono" : [],
+            "comm" : [],
+            "database" : ["Productivity/Database"],
+            "debian-installer" : [],
+            "debug" : ["Development/Tools/Debuggers"],
+            "devel" : ["Development/Languages/C and C++"],
+            "doc" : ["Documentation"],
+            "editors" : [],
+            "electronics": [],
+            "embedded" :[],
+            "fonts" : [],
+            "games" : ["Amusements/Game"],
+            "gnome" : ["System/GUI/GNOME"],
+            "gnu-r" : [],
+            "gnustep" : ["System/GUI/Other"],
+            "graphics": ["Productivity/Graphics"],
+            "hamradio" : ["Productivity/Hamradio"],
+            "haskell" : [],
+            "httpd" : ["Productivity/Networking/Web"],
+            "interpreters": ["Development/Languages/Other"],
+            "java": ["Development/Languages/Java"],
+            "kde": ["System/GUI/KDE"],
+            "kernel":["System/Kernel"],
+            "libdevel":["Development/Tool"],
+            "libs":["Development/Lib", "System/Lib"],
+            "lisp":[],
+            "localization":["System/Localization", "System/i18n"],
+            "mail":["Productivity/Networking/Email"],
+            "math":["Amusements/Teaching/Math", "Productivity/Scientific/Math"],
+            "misc":[],
+            "net":["Productivity/Networking/System"],
+            "news":["Productivity/Networking/News"],
+            "ocaml":[],
+            "oldlibs":[],
+            "othersofs":[],
+            "perl":["Development/Languages/Perl"],
+            "php":[],
+            "python":["Development/Languages/Python"],
+            "ruby":["Development/Languages/Ruby"],
+            "science":["Productivity/Scientific"],
+            "shells":["System/Shell"],
+            "sound":["System/Sound"],
+            "tex":["Productivity/Publishing/TeX"],
+            "text":["Productivity/Publishing"],
+            "utils":[],
+            "vcs":["Development/Tools/Version Control"],
+            "video":[],
+            "virtual":[],
+            "web":[],
+            "x11":["System/X11"],
+            "xfce":["System/GUI/XFCE"],
+            "zope":[],
+        }
         if isinstance(group, list) and len(group) >= 1:
             group = group[0]
-        if "Lib" in group:
+        for section, group_prefixes in debian.items():
+            for group_prefix in group_prefixes:
+                if group.startswith(group_prefix):
+                    return section
+        # make a guess:
+        if  "Lib" in group:
             return "libs"
+        elif  "Network" in group:
+            return "net"
         else:
             return "utils"
     def deb_description_lines(self, text, prefix="Description:"):
