@@ -45,7 +45,7 @@
      be converted into patches. So they should better be plain text files.
    * The Patch:-files are pushed to the debian/series of course that will
      also specify the order of applying patches. The current order is taken
-     from the number if the declaration, i.e. it is not the order of
+     from the number in the declaration header, i.e. it is not the order of
      appearance in in the %setup section (that would be a TODO then).
    * The postinst/prerm scripts are converted and there is a header section
      that maps "install/upgrade" to the "$1" 0/1/2 style of rpm scripts. But
