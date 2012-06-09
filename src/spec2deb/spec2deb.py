@@ -20,7 +20,6 @@ import logging
 import commands
 import glob
 import sys
-import random
 
 _log = logging.getLogger(__name__)
 urgency = "low"
