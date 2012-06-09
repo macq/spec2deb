@@ -52,4 +52,4 @@ Examples for existing DEBs converted from RPMs can be seen in:
 ## Documentation ##
 
 There is additional documentation in the README.TXT in the project sources.
-* https://bitbucket.org/guidod/spec2deb/history/src/README.TXT
+* <https://bitbucket.org/guidod/spec2deb/history/src/README.TXT>
