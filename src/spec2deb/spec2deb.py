@@ -502,13 +502,6 @@ class RpmSpecToDebianControl:
             self.endof_changelog()
         else:
             _log.fatal("UNKNOWN state %s (at end of file)", self.states)
-    def package_mapping(self, package):
-        known = known_package_mapping
-        if package.endswith("-devel"):
-            package = package[:-2]
-        if package in known:
-            package = known[package]
-        return package
     on_var1 = re.compile(r"%(\w+)\b")
     on_var2 = re.compile(r"%{(\w+)}")
     def expand(self, text):
@@ -560,8 +553,19 @@ class RpmSpecToDebianControl:
             deb_package = package
             if deb_package == "%{name}" and len(self.packages) > 1:
                 deb_package = "%{name}-bin"
-            deb_package = string.lower(self.expand(deb_package))
-            yield self.package_mapping(deb_package), package
+            deb_package = self.deb_package_name(self.expand(deb_package))
+            yield deb_package, package
+    def deb_package_name(self, deb_package):
+        """ debian.org/doc/debian-policy/ch-controlfields.html##s-f-Source
+            ... must consist only of lower case letters (a-z), digits (0-9), 
+            plus (+) and minus (-) signs, and periods (.), must be at least 
+            two characters long and must start with an alphanumeric. """
+        package = string.lower(deb_package).replace("_","")
+        if package.endswith("-devel"):
+            package = package[:-2]
+        if package in known_package_mapping:
+            package = known_package_mapping[package]
+        return package
     def deb_build_depends(self):
         depends = [ "debhelper (>= %s)" % self.debhelper_compat ]
         for package in self.packages:
@@ -574,10 +578,11 @@ class RpmSpecToDebianControl:
         withversion = re.match("(\S+)\s+(>=|>|<|<=|==)\s+(\S+)", requires)
         if withversion:
             package, relation, version = withversion.groups()
-            depend = "%s (%s %s)" % (string.lower(package), relation, version)
+            deb_package = self.deb_package_name(package)
+            return "%s (%s %s)" % (deb_package, relation, version)
         else:
-            depend = string.lower(requires.strip())
-        return self.package_mapping(depend)
+            deb_package = self.deb_package_name(requires.strip())
+            return deb_package
     def deb_sourcefile(self):
         sourcefile = self.get("source", self.get("source0"))
         x = sourcefile.rfind("/")
