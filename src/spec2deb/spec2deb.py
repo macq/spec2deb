@@ -753,12 +753,13 @@ class RpmSpecToDebianControl:
                     yield "+"+path
         if docs:
             yield nextfile+"docs"
-            for path in docs:
-                if True:
-                    path = self.expand(path)
+            for doc in docs:
+                for path in doc.split(" "):
+                    path = self.expand(path.strip())
                     if path.startswith("/"):
                         path = path[1:]
-                    yield "+"+path
+                    if path:
+                        yield "+"+path
     def debian_changelog(self, nextfile = _nextfile):
         name = self.expand(self.get("name"))
         version = self.expand(self.get("version"))
