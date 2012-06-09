@@ -111,7 +111,7 @@
    there is an ".osc" subdirectory then the DEBTRANSFORM is chosen. Also all 
    debian files are generated to the local directory which is then ready 
    for "osc commit". That commit will trigger a Debian build of the associated 
-   OBS project at build.opensuse.org. 
+   OBS project at build.opensuse.org (or some other OBS type build service).
    
    So the command line options are basically optimized for that usage: after 
    having a change on the rpm parts of an OBS project you can easily regenerate
