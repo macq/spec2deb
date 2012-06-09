@@ -240,7 +240,18 @@ class RpmSpecToDebianControl:
     on_default_var2 = re.compile(r"\s*[%][{][!][?](\w+)[:]\s*[%][{][?](\w+)[:]\s*[%](define|global)\s+\1\b(.*)[}][}]")
     def default_var2(self, found_default_var):
         name, name2, typed, value = found_default_var.groups()
-        if self.has(name2):
+        if not self.has(name2):
+            return
+        if not self.has(name):
+            self.set(name, value.strip(), typed)
+        else:
+            _log.debug("override %%%s %s %s", typed, name, value)
+        if typed != "global":
+            _log.warning("do not use %%define in default-variables, use %%global %s", name) 
+    on_default_var3 = re.compile(r"\s*[%][{][!][?](\w+)[:]\s*[%][{][?](\w+)[:]\s*[%](define|global)\s+\1\b(.*)[}][}]")
+    def default_var3(self, found_default_var):
+        name, name3, typed, value = found_default_var.groups()
+        if self.has(name3):
             return
         if not self.has(name):
             self.set(name, value.strip(), typed)
@@ -508,25 +519,25 @@ class RpmSpecToDebianControl:
                     value = self.get(name)
                     text = re.sub("%"+name+"\\b", value, text)
                 else:
-                    _log.error("unable to expand %%%s in:\n%s", name, orig)
+                    _log.error("unable to expand %%%s in:\n %s", name, orig)
             for found in on_required_name.finditer(text):
                 name, = found.groups()
                 if self.has(name):
                     value = self.get(name)
                     text = re.sub("%{"+name+"}", value , text)
                 else:
-                    _log.error("unable to expand %%{%s} in:\n%s", name, orig)
+                    _log.error("unable to expand %%{%s} in:\n %s", name, orig)
             for found in on_optional_name.finditer(text):
                 name, = found.groups()
                 if self.has(name):
                     value = ''
                     text = re.sub("%{?"+name+"}", value, text)
                 else:
-                    _log.debug("expand optional %%{?%s} to ''in:\n%s", name, orig)
+                    _log.debug("expand optional %%{?%s} to '' in: '%s'", name, orig)
             if oldtext == text:
                 break
         if "$(" in text and orig not in [ "%buildroot", "%__make" ]:
-            _log.warning("expand of '%s' left a make variable:\n%s", orig, text)
+            _log.warning("expand of '%s' left a make variable:\n %s", orig, text)
         return text
     def deb_packages(self):
         for deb, pkg in self.deb_packages2():
@@ -1211,7 +1222,7 @@ if __name__ == "__main__":
         _log.log(HINT, cmd)
         status, output = commands.getstatusoutput(cmd)
         if status:
-            _log.fatal("dpkg-source -x failed with %s#%s:\n%s", status>>8, status&255, output)
+            _log.fatal("dpkg-source -x failed with %s#%s:\n %s", status>>8, status&255, output)
         else:
             _log.info("%s", output)
     if opts.build:
@@ -1219,7 +1230,7 @@ if __name__ == "__main__":
         _log.log(HINT, cmd)
         status, output = commands.getstatusoutput(cmd)
         if status:
-            _log.fatal("dpkg-source -b failed with %s#%s:\n%s", status>>8, status&255, output)
+            _log.fatal("dpkg-source -b failed with %s#%s:\n %s", status>>8, status&255, output)
         else:
             _log.info("%s", output)
             
