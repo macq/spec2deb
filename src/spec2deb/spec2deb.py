@@ -25,6 +25,7 @@ _log = logging.getLogger(__name__)
 urgency = "low"
 promote = "unstable"
 standards_version = "3.8.2"
+debhelper_compat = "5" # below 5 is deprecated, latest is 7
 
 debtransform = False
 if os.path.isdir(".osc"):
@@ -716,6 +717,8 @@ class RpmSpecToDebianControl:
                         path = path[len("%config"):].strip()
                         if path:
                             files_list.append(path)
+                            if "/etc/" not in "/"+path:
+                                _log.warning("debhelpers will treat files in /etc/ as configs but not your '%s'", path)
                     elif path.startswith("%doc"):
                         path = path[len("%doc"):].strip()
                         docs += [ path ]
@@ -769,6 +772,8 @@ class RpmSpecToDebianControl:
         yield "+"
         yield "+ -- %s  Mon, 25 Dec 2007 10:50:38 +0100" % (packager)
     def debian_rules(self, nextfile = _nextfile):
+        yield nextfile +"debian/compat"
+        yield "+%s" % debhelper_compat
         yield nextfile+"debian/rules"
         yield "+#!/usr/bin/make -f"
         yield "+# -*- makefile -*-"
@@ -1140,6 +1145,7 @@ _o.add_option("-2","--packages",action="count", help="show the package settings 
 _o.add_option("-x","--extract", action="count", help="run dpkg-source -x after generation")
 _o.add_option("-b","--build", action="count", help="run dpkg-source -b after generation")
 _o.add_option("--format",metavar=FORMAT, help="specify debian/source/format affecting generation")
+_o.add_option("--compat",metavar=debhelper_compat, help="specify debian/compat debhelper level")
 _o.add_option("--no-debtransform",action="count", help="disable dependency on OBS debtransform")
 _o.add_option("--debtransform",action="count", help="enable dependency on OBS debtransform (%default)", default = debtransform)
 _o.add_option("--urgency", metavar=urgency, help="set urgency level for debian/changelog")
