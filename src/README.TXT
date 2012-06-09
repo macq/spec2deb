@@ -150,7 +150,7 @@
 * fixup postinst/prerm scripts to do the right thing when called with
   something unknown from rpm, e.g. the "abort-install" mode of postinst
   might be mapped to the %postun script that needs to be added (with if-else).
-* shell-vars that can not be pushed to be make-vars
+* handle shell-vars correctly that can not be pushed to be make-vars
 * possible option that the rpm build shell-script is not converted to be a
   make build snippet but it is left as a shell-script that is called from
   debian/rules (with a series of shell-variables being preset)
