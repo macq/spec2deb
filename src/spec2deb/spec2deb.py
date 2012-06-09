@@ -194,13 +194,10 @@ class RpmSpecToDebianControl:
         if not self.package or self.package == "%{name}":
             if not name.startswith("%"):
                 name1 = string.lower(name)
-                name2 = string.upper(name)
                 if name1 in ["source", "patch"]:
                     name1 += "0"
-                    name2 += "0"
                 if name1 not in ignores:
                     self.set(name1, value.strip(), "package")
-                    self.set(name2, value.strip(), "package")
             else:
                 _log.debug("ignored to add a setting '%s'", name)
         else:
@@ -977,13 +974,19 @@ class RpmSpecToDebianControl:
             source = self.get("source%i" % n)
             if source:
                 try:
+                    source = os.path.basename(source) # strip any URL prefix
                     _log.debug("append source%i '%s' as a patch", n, source)
+                    if source in [ "format" ]:
+                        _log.fatal("ignored source%i: %s -> conflict with debian/source/format", n, source)
+                        continue
+                    sourcepath = "debian/source/"+source
                     textfile = open(source)
-                    yield nextfile+source
+                    yield nextfile+sourcepath
                     for line in textfile:
                         yield "+"+line
                     textfile.close()
-                    patches.append(source)
+                    # patches.append(source) -> do not do this anymore
+                    self.set("SOURCE%i" % n, "$(CURDIR)/"+sourcepath, "source")
                 except Exception, e:
                     _log.error("append source%i '%s' failed:\n %s", n, source, e)
         patch = self.get("patch")
@@ -1012,7 +1015,7 @@ class RpmSpecToDebianControl:
             return "%s/%s" % (subdir, patch)
     def debian_diff(self):
         for deb in (self.debian_control, self.debian_copyright, self.debian_install,
-                    self.debian_changelog, self.debian_rules, self.debian_patches,
+                    self.debian_changelog, self.debian_patches, self.debian_rules, 
                     self.debian_scripts):
             src = self.deb_src()
             old = src+".orig"
