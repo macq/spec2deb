@@ -8,7 +8,7 @@ README = open("README.TXT").read()
 setup(
   package_data = { "spec2deb" : [ "spec2deb.py" ]},
   name = "spec2deb",
-  version = "0.3",
+  version = "0.4",
   packages = [ "spec2deb" ],
   keywords = 'rpm spec deb debian converter',
   author = 'Guido Draheim',
