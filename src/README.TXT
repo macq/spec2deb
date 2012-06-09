@@ -50,7 +50,7 @@
    * The postinst/prerm scripts are converted and there is a header section
      that maps "install/upgrade" to the "$1" 0/1/2 style of rpm scripts. But
      the debian style has more steps and modes which are NOT covered correctly. 
-     So you should keep your "maintainer scripts" rather simple so that it
+     So you should keep your "maintainer scripts" rather simple so that them
      can get away with being called multiple times during install/remove. 
      
 ## FORMATS ##
