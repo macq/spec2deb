@@ -124,6 +124,7 @@ class RpmSpecToDebianControl:
         self.debtransform = debtransform
         self.scan_macros(usr_lib_rpm_macros, "default")
         self.scan_macros(debian_special_macros, "debian")
+        self.cache_packages2 = []
     def has_names(self):
         return self.var.keys()
     def has(self, name):
@@ -549,11 +550,20 @@ class RpmSpecToDebianControl:
         for deb, _ in self.deb_packages2():
             yield deb
     def deb_packages2(self):
+        if self.cache_packages2:
+            for item in self.cache_packages2:
+                yield item
+        else:
+            for item in self._deb_packages2():
+                self.cache_packages2.append(item)
+                yield item
+    def _deb_packages2(self):
         for package in sorted(self.packages):
             deb_package = package
             if deb_package == "%{name}" and len(self.packages) > 1:
                 deb_package = "%{name}-bin"
-            yield self.package_mapping(self.expand(deb_package)), package
+            deb_package = string.lower(self.expand(deb_package))
+            yield self.package_mapping(deb_package), package
     def deb_build_depends(self):
         depends = [ "debhelper (>= 7)" ]
         for package in self.packages:
