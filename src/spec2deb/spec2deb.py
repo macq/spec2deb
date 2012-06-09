@@ -881,6 +881,11 @@ class RpmSpecToDebianControl:
         yield "+.PHONY: build clean binary-indep binary-arch binary install"
     def deb_script(self, section):
         script = self.packages["%{name}"].get(section, "")
+        on_ifelse_if = re.compile(r"\s*if\s+.*$")
+        on_ifelse_then = re.compile(r".*;\s*then\s*$")
+        on_ifelse_else = re.compile(r"\s*else\s*$|.*;\s*else\s*$")
+        on_ifelse_ends = re.compile(r"\s*fi\s*$|.*;\s*fi\s*$")
+        ifelse = False
         for lines in script:
             for line in lines.split("\n"):
                 if line.startswith("%setup"): 
@@ -926,6 +931,26 @@ class RpmSpecToDebianControl:
                 if line.strip() == "rm -rf $(CURDIR)/debian/tmp":
                     if section != "%clean":
                         _log.warning("found rm -rf %%buildroot in section %s (should only be in %%clean)", section)
+                # ifelse handling
+                found_ifelse_if = on_ifelse_if.match(line)
+                found_ifelse_then = on_ifelse_then.match(line)
+                found_ifelse_else = on_ifelse_else.match(line)
+                found_ifelse_ends = on_ifelse_ends.match(line)
+                if found_ifelse_if and not found_ifelse_then:
+                    _log.error("'if'-line without '; then' -> not supported\n %s", line)
+                    ifelse = True
+                elif found_ifelse_then:
+                    line = line + " \\"
+                    ifelse = True
+                elif found_ifelse_else:
+                    line = line + " \\"
+                    if not ifelse:
+                        _log.error("'else' outside ';then'-block")
+                elif found_ifelse_ends:
+                    ifelse = False
+                elif ifelse:
+                    if not line.strip().endswith("\\"):
+                        line += "; \\"
                 if line.strip():
                     yield line
     def debian_scripts(self, nextfile = _nextfile):

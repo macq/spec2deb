@@ -51,6 +51,9 @@
      the debian style has more steps and modes which are NOT covered correctly. 
      So you should keep your "maintainer scripts" rather simple so that them
      can get away with being called multiple times during install/remove. 
+   * Simple if-else-fi blocks in the rpm build shell script are supported so
+     they are assembled into one make execution (seperated by ";"). However 
+     the condition must look like "if condition; then" on a single line.
      
 ## FORMATS ##
 
@@ -139,9 +142,8 @@
 ** recognize "export var=" in a build-script and convert the shell-var
    into a make-var emitting them on the global section if possible
 * rewrite debian/rules multiline-handling
-** currently uses conversion of one shell-line into one make-line
-** recognize atleast shell if-else-fi constructs spanning multiple lines
-   to be assembled to one make-line (with breaks of the "\\\n;"-style).
+** currently uses conversion of one shell-line into one make-line as the
+   default operation (it only has support for simple if-else blocks)
 * more testing with real installations.
    
 ## WISHLIST for 1.1+ ##
