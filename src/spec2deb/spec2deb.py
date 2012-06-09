@@ -96,6 +96,12 @@ debian_special_macros = """
 %build_alias            $(DEB_BUILD_GNU_TYPE)
 """
 
+known_package_mapping = { 
+    "zlib-dev" : "zlib1g-dev",
+    "sdl-dev" : "libsdl-dev",
+    "sdl" : "libsdl",
+}
+
 class RpmSpecToDebianControl:
     on_comment = re.compile("^#.*")
     def __init__(self):
@@ -495,10 +501,7 @@ class RpmSpecToDebianControl:
         else:
             _log.fatal("UNKNOWN state %s (at end of file)", self.states)
     def package_mapping(self, package):
-        known = { "zlib-dev" : "zlib1g-dev",
-                  "sdl-dev" : "libsdl-dev",
-                  "sdl" : "libsdl",
-                }
+        known = known_package_mapping
         if package.endswith("-devel"):
             package = package[:-2]
         if package in known:
