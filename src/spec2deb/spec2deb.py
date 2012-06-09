@@ -25,6 +25,7 @@ _log = logging.getLogger(__name__)
 urgency = "low"
 promote = "unstable"
 standards_version = "3.8.2"
+debhelper_compat = "5" # below 5 is deprecated, latest is 7
 
 debtransform = False
 if os.path.isdir(".osc"):
@@ -42,8 +43,8 @@ if os.path.isdir(".osc"):
 #       and run them in your sources directory (*tar, *.spec,*.dsc) 
 #       (rm -rf x; mkdir x; debtransform . *.dsc x/; cd x; dpkg-source -x *.dsc)
 
-NEXT = "--- "
 FORMAT = "1.0" # "2.0" # "3.0 (quilt)" # 
+_nextfile = "--- " # mark the start of the next file during diff generation
 
 _formats = { 
     "1" : "1.0", 
@@ -51,6 +52,57 @@ _formats = {
     "3" : "3.0 (quilt)", 
     "3.0" : "3.0 (quilt)", 
     "3.0 (quilt)" : "3.0 (quilt)"
+}
+
+usr_lib_rpm_macros = """# copy-n-paste from /usr/lib/rpm/macros
+%_usr                   /usr
+%_usrsrc                %{_usr}/src
+%_var                   /var
+%__cp                   /bin/cp
+%__install              /usr/bin/install
+%__ln_s                 ln -s
+%__mkdir                /bin/mkdir
+%__mkdir_p              /bin/mkdir -p
+%__mv                   /bin/mv
+%__perl                 /usr/bin/perl
+%__python               /usr/bin/python
+%__rm                   /bin/rm
+%__sed                  /usr/bin/sed
+%__tar                  /bin/tar
+%__unzip                /usr/bin/unzip
+
+%_prefix                /usr
+%_exec_prefix           %{_prefix}
+%_bindir                %{_exec_prefix}/bin
+%_sbindir               %{_exec_prefix}/sbin
+%_libexecdir            %{_exec_prefix}/libexec
+%_datadir               %{_prefix}/share
+%_sysconfdir            /etc
+%_sharedstatedir        %{_prefix}/com
+%_localstatedir         %{_prefix}/var
+%_lib                   lib
+%_libdir                %{_exec_prefix}/%{_lib}
+%_includedir            %{_prefix}/include
+%_infodir               %{_datadir}/info
+%_mandir                %{_datadir}/man
+
+%_tmppath               %{_var}/tmp
+%_docdir                %{_datadir}/doc
+"""
+
+debian_special_macros = """
+%__make                 $(MAKE)
+%buildroot              $(CURDIR)/debian/tmp
+%host                   $(DEB_HOST_GNU_TYPE)
+%host_alias             $(DEB_HOST_GNU_TYPE)
+%build                  $(DEB_BUILD_GNU_TYPE)
+%build_alias            $(DEB_BUILD_GNU_TYPE)
+"""
+
+known_package_mapping = { 
+    "zlib-dev" : "zlib1g-dev",
+    "sdl-dev" : "libsdl-dev",
+    "sdl" : "libsdl",
 }
 
 class RpmSpecToDebianControl:
@@ -63,31 +115,47 @@ class RpmSpecToDebianControl:
         self.section = ""
         self.sectiontext = ""
         self.states = []
-        self.var = { "_prefix" : "/usr",
-                     "_libdir" : "%{_prefix}/lib",
-                     "_libexecdir" : "%{_prefix}/lib",
-                     "_includedir" : "%{_prefix}/include",
-                     "_bindir" : "%{_prefix}/bin",
-                     "_sbindir" : "%{_prefix}/sbin",
-                     "_datadir" : "%{_prefix}/share",
-                     "_mandir" : "%{_datadir}/man",
-                     "_docdir" : "%{_datadir}/doc",
-                     "_infodir" : "%{_datadir}/info",
-                     "_localstatedir" : "%{_prefix}/var",
-                     "_sharedstatedir" : "%{_prefix}/com",
-                     "_sysconfdir" : "/etc",
-                   }
-        self.commands = {
-                        "%__make" : "$(MAKE)",
-                        "%__rm" : "rm",
-                        "%__mkdir_p" : "mkdir -p",
-                        "%__install" : "install",
-                        }
+        self.var = {}
+        self.typed = {}
         self.urgency = urgency
         self.promote = promote
         self.standards_version = standards_version
+        self.debhelper_compat = debhelper_compat
         self.format = FORMAT
         self.debtransform = debtransform
+        self.scan_macros(usr_lib_rpm_macros, "default")
+        self.scan_macros(debian_special_macros, "debian")
+        self.cache_packages2 = []
+    def has_names(self):
+        return self.var.keys()
+    def has(self, name):
+        if name in self.var:
+            return True
+        return False
+    def get(self, name, default = None):
+        if name in self.var:
+            return self.var[name]
+        return default
+    def set(self, name, value, typed):
+        if name in self.var:
+            if self.typed[name] == "debian":
+                _log.debug("ignore %s var '%s'", self.typed[name], name)
+                return
+            if self.var[name] != value:
+                _log.info("override %s %s %s (was %s)", 
+                          typed, name, value, self.var[name])
+        self.var[name] = value
+        self.typed[name] = typed
+        return self
+    def scan_macros(self, text, typed):
+        definition = re.compile("\s*[%](\w+)\s+(.*)")
+        for line in text.split("\n"):
+            found = definition.match(line)
+            if found:
+                name, value = found.groups()
+                self.set(name, value.strip(), typed)
+        return self
+    # ========================================================= PARSER
     def state(self):
         if not self.states:
             return None
@@ -120,9 +188,22 @@ class RpmSpecToDebianControl:
         self.packages.setdefault(self.package, {})
     def append_setting(self, name, value):
         self.packages[self.package].setdefault(name,[]).append(value.strip())
+        # also provide the setting for macro expansion:
+        ignores =  [ "requires","buildrequires","prereq",
+                     "provides", "conflicts", "suggests"]
         if not self.package or self.package == "%{name}":
             if not name.startswith("%"):
-                self.var[string.lower(name)] = value.strip()
+                name1 = string.lower(name)
+                if name1 in ["source", "patch"]:
+                    name1 += "0"
+                if name1 not in ignores:
+                    self.set(name1, value.strip(), "package")
+            else:
+                _log.debug("ignored to add a setting '%s'", name)
+        else:
+            if name not in ignores:
+                _log.debug("ignored to add a setting '%s' from package '%s'", 
+                           name, self.package)
     def new_section(self, section, text = ""):
         self.section = section.strip()
         self.sectiontext = text
@@ -130,8 +211,8 @@ class RpmSpecToDebianControl:
         self.sectiontext += text or ""
     on_variable = re.compile(r"%(define|global)\s+(\S+)\s+(.*)")
     def save_variable(self, found_variable):
-        rule, name, value = found_variable.groups()
-        self.var[name] = value.strip()
+        typed, name, value = found_variable.groups()
+        self.set(name.strip(), value.strip(), typed)
     on_setting = re.compile(r"\s*(\w+)\s*:\s*(\S.*)")
     def save_setting(self, found_setting):
         name, value = found_setting.groups()
@@ -158,22 +239,37 @@ class RpmSpecToDebianControl:
     on_default_var1 = re.compile(r"\s*%\{!\?(\w+):\s+%(define|global)\s+\1\b(.*)\}")
     def default_var1(self, found_default_var):
         name, typed, value = found_default_var.groups()
-        if name not in self.var:
-            self.var[name.strip()] = value.strip()
+        if not self.has(name):
+            self.set(name.strip(), value.strip(), typed)
+        else:
+            _log.debug("override %%%s %s %s", typed, name, value)
         if typed != "global":
             _log.warning("do not use %%define in default-variables, use %%global %s", name) 
     on_default_var2 = re.compile(r"\s*[%][{][!][?](\w+)[:]\s*[%][{][?](\w+)[:]\s*[%](define|global)\s+\1\b(.*)[}][}]")
     def default_var2(self, found_default_var):
         name, name2, typed, value = found_default_var.groups()
-        if name2 not in self.var:
+        if not self.has(name2):
             return
-        if name not in self.var:
-            self.var[name.strip()] = value.strip()
+        if not self.has(name):
+            self.set(name, value.strip(), typed)
+        else:
+            _log.debug("override %%%s %s %s", typed, name, value)
+        if typed != "global":
+            _log.warning("do not use %%define in default-variables, use %%global %s", name) 
+    on_default_var3 = re.compile(r"\s*[%][{][!][?](\w+)[:]\s*[%][{][?](\w+)[:]\s*[%](define|global)\s+\1\b(.*)[}][}]")
+    def default_var3(self, found_default_var):
+        name, name3, typed, value = found_default_var.groups()
+        if self.has(name3):
+            return
+        if not self.has(name):
+            self.set(name, value.strip(), typed)
+        else:
+            _log.debug("override %%%s %s %s", typed, name, value)
         if typed != "global":
             _log.warning("do not use %%define in default-variables, use %%global %s", name) 
     on_package = re.compile(r"%(package)(?:\s+(\S+))?(?:\s+(-.*))?")
     def start_package(self, found_package):
-        rule, package, options = found_package.groups()
+        _, package, options = found_package.groups()
         self.new_package(package, options)
         self.new_state("package")
     on_description = re.compile(r"%(description)(?:\s+(\S+))?(?:\s+(-.*))?")
@@ -192,7 +288,7 @@ class RpmSpecToDebianControl:
         self.new_state("changelog")
     def endof_changelog(self):
         self.append_setting(self.section, self.sectiontext)
-    on_rules = re.compile(r"%(prep|build|install|check|clean)(?:\s+(-.*))?")
+    on_rules = re.compile(r"%(prep|build|install|check|clean)\b(?:\s+(-.*))?")
     def start_rules(self, found_rules):
         rule, options = found_rules.groups()
         self.new_package("", options)
@@ -201,7 +297,7 @@ class RpmSpecToDebianControl:
         self.new_state("rules")
     def endof_rules(self):
         self.append_setting(self.section, self.sectiontext)
-    on_scripts = re.compile(r"%(post|postun|pre|preun)(?:\s+(\w\S+))?(?:\s+(-.*))?")
+    on_scripts = re.compile(r"%(post|postun|pre|preun)\b(?:\s+(\w\S+))?(?:\s+(-.*))?")
     def start_scripts(self, found_scripts):
         rule, package, options = found_scripts.groups()
         self.new_package(package, options)
@@ -406,38 +502,72 @@ class RpmSpecToDebianControl:
             self.endof_changelog()
         else:
             _log.fatal("UNKNOWN state %s (at end of file)", self.states)
-    def package_mapping(self, package):
-        known = { "zlib-dev" : "zlib1g-dev",
-                  "sdl-dev" : "libsdl-dev",
-                  "sdl" : "libsdl",
-                }
-        if package.endswith("-devel"):
-            package = package[:-2]
-        if package in known:
-            package = known[package]
-        return package
     on_var1 = re.compile(r"%(\w+)\b")
     on_var2 = re.compile(r"%{(\w+)}")
     def expand(self, text):
+        orig = text
+        on_plain_name = re.compile(r"[%](\w+)\b")
+        on_required_name = re.compile(r"[%][{](\w+)[}]")
+        on_optional_name = re.compile(r"[%][{][?](\w+)[}]")
         for _ in xrange(100):
             oldtext = text
-            for name, value in self.var.items():
-                text = re.sub("%"+name+"\\b", value, text)
-                text = re.sub("%{"+name+"}", value, text)
+            for found in on_plain_name.finditer(text):
+                name, = found.groups()
+                if self.has(name):
+                    value = self.get(name)
+                    text = re.sub("%"+name+"\\b", value, text)
+                else:
+                    _log.error("unable to expand %%%s in:\n %s", name, orig)
+            for found in on_required_name.finditer(text):
+                name, = found.groups()
+                if self.has(name):
+                    value = self.get(name)
+                    text = re.sub("%{"+name+"}", value , text)
+                else:
+                    _log.error("unable to expand %%{%s} in:\n %s", name, orig)
+            for found in on_optional_name.finditer(text):
+                name, = found.groups()
+                if self.has(name):
+                    value = ''
+                    text = re.sub("%{?"+name+"}", value, text)
+                else:
+                    _log.debug("expand optional %%{?%s} to '' in: '%s'", name, orig)
             if oldtext == text:
                 break
+        if "$(" in text and orig not in [ "%buildroot", "%__make" ]:
+            _log.warning("expand of '%s' left a make variable:\n %s", orig, text)
         return text
     def deb_packages(self):
-        for deb, pkg in self.deb_packages2():
+        for deb, _ in self.deb_packages2():
             yield deb
     def deb_packages2(self):
+        if self.cache_packages2:
+            for item in self.cache_packages2:
+                yield item
+        else:
+            for item in self._deb_packages2():
+                self.cache_packages2.append(item)
+                yield item
+    def _deb_packages2(self):
         for package in sorted(self.packages):
             deb_package = package
             if deb_package == "%{name}" and len(self.packages) > 1:
                 deb_package = "%{name}-bin"
-            yield self.package_mapping(self.expand(deb_package)), package
+            deb_package = self.deb_package_name(self.expand(deb_package))
+            yield deb_package, package
+    def deb_package_name(self, deb_package):
+        """ debian.org/doc/debian-policy/ch-controlfields.html##s-f-Source
+            ... must consist only of lower case letters (a-z), digits (0-9), 
+            plus (+) and minus (-) signs, and periods (.), must be at least 
+            two characters long and must start with an alphanumeric. """
+        package = string.lower(deb_package).replace("_","")
+        if package.endswith("-devel"):
+            package = package[:-2]
+        if package in known_package_mapping:
+            package = known_package_mapping[package]
+        return package
     def deb_build_depends(self):
-        depends = [ "debhelper (>= 7)" ]
+        depends = [ "debhelper (>= %s)" % self.debhelper_compat ]
         for package in self.packages:
             for buildrequires in self.packages[package].get("buildrequires", []):
                 depend = self.deb_requires(buildrequires)
@@ -448,20 +578,21 @@ class RpmSpecToDebianControl:
         withversion = re.match("(\S+)\s+(>=|>|<|<=|==)\s+(\S+)", requires)
         if withversion:
             package, relation, version = withversion.groups()
-            depend = "%s (%s %s)" % (string.lower(package), relation, version)
+            deb_package = self.deb_package_name(package)
+            return "%s (%s %s)" % (deb_package, relation, version)
         else:
-            depend = string.lower(requires.strip())
-        return self.package_mapping(depend)
+            deb_package = self.deb_package_name(requires.strip())
+            return deb_package
     def deb_sourcefile(self):
-        sourcefile = self.var.get("source", self.var.get("source0"))
+        sourcefile = self.get("source", self.get("source0"))
         x = sourcefile.rfind("/")
         if x:
             sourcefile = sourcefile[x+1:]
         return sourcefile
     def deb_version(self):
-        return self.var.get("version","")
+        return self.get("version","")
     def deb_source(self, sourcefile = None):
-        return self.var.get("name")
+        return self.get("name")
     def deb_src(self):
         script = self.packages["%{name}"].get("%prep", "")
         for part in script:
@@ -472,8 +603,8 @@ class RpmSpecToDebianControl:
                         return m.group(1)
                     return self.deb_source()+"-"+self.deb_version()
         _log.error("no %setup in %prep section found")
-    def debian_dsc(self, next = NEXT, into = None):
-        yield next+"debian/dsc"
+    def debian_dsc(self, nextfile = _nextfile, into = None):
+        yield nextfile+"debian/dsc"
         yield "+Format: %s" % self.format
         sourcefile = self.deb_sourcefile()
         source = self.deb_source(sourcefile)
@@ -481,11 +612,11 @@ class RpmSpecToDebianControl:
         binaries = list(self.deb_packages())
         yield "+Binary: %s" % ", ".join(binaries)
         yield "+Architecture: %s" % "any"
-        version = self.var.get("version","0")+"-"+self.var.get("revision","0")
+        version = self.get("version","0")+"-"+self.get("revision","0")
         yield "+Version: %s" % version
-        yield "+Maintainer: %s" % self.var.get("packager","?")
+        yield "+Maintainer: %s" % self.get("packager","?")
         yield "+Standards-Version: %s" % self.standards_version
-        yield "+Homepage: %s" % self.var.get("url","")
+        yield "+Homepage: %s" % self.get("url","")
         depends = list(self.deb_build_depends())
         yield "+Build-Depends: %s" % ", ".join(depends)
         source_file = self.expand(sourcefile)
@@ -540,18 +671,18 @@ class RpmSpecToDebianControl:
             else:
                 yield prefix+" "+line
             prefix = ""
-    def debian_control(self, next = NEXT):
-        yield next+"debian/control"
-        group = self.var.get("group","System/Libraries")
+    def debian_control(self, nextfile = _nextfile):
+        yield nextfile+"debian/control"
+        group = self.get("group","System/Libraries")
         section = self.group2section(group)
         yield "+Priority: %s" % "optional"
-        yield "+Maintainer: %s" % self.var.get("packager","?")
+        yield "+Maintainer: %s" % self.get("packager","?")
         source = self.deb_source()
         yield "+Source: %s" % self.expand(source)
         depends = list(self.deb_build_depends())
         yield "+Build-Depends: %s" % ", ".join(depends)
         yield "+Standards-Version: %s" % self.standards_version
-        yield "+Homepage: %s" % self.var.get("url","")
+        yield "+Homepage: %s" % self.get("url","")
         yield "+"
         for deb_package, package in sorted(self.deb_packages2()):
             yield "+Package: %s" % deb_package
@@ -580,10 +711,11 @@ class RpmSpecToDebianControl:
             for line in self.deb_description_lines(text):
                 yield "+"+line
             yield "+"
-    def debian_copyright(self, next = NEXT):
-        yield next+"debian/copyright"
-        yield "+License: %s" % self.var.get("license","")
-    def debian_install(self, next = NEXT):
+    def debian_copyright(self, nextfile = _nextfile):
+        yield nextfile+"debian/copyright"
+        yield "+License: %s" % self.get("license","")
+    def debian_install(self, nextfile = _nextfile):
+        docs = []
         for deb_package, package in sorted(self.deb_packages2()):
             files_name =  "debian/%s.install" % deb_package
             dirs_name =  "debian/%s.dirs" % deb_package
@@ -593,20 +725,19 @@ class RpmSpecToDebianControl:
             if not isinstance(filesection, list): 
                 filesection = [ filesection ]
             for files in filesection:
-                for filespec in files.split("\n"):
-                    path = self.expand(filespec.strip())
+                for path in files.split("\n"):
                     if path.startswith("%config"):
                         path = path[len("%config"):].strip()
-                        if path.startswith("/"):
-                            path = path[1:]
                         if path:
                             files_list.append(path)
+                            if "/etc/" not in "/"+path:
+                                _log.warning("debhelpers will treat files in /etc/ as configs but not your '%s'", path)
                     elif path.startswith("%doc"):
+                        path = path[len("%doc"):].strip()
+                        docs += [ path ]
                         continue
                     elif path.startswith("%dir"):
                         path = path[len("%dir"):].strip()
-                        if path.startswith("/"):
-                            path = path[1:]
                         if path:
                             dirs_list.append(path)
                         continue
@@ -620,27 +751,44 @@ class RpmSpecToDebianControl:
                             files_list.append(path)
                         continue
             if dirs_list:
-                yield next+dirs_name
+                yield nextfile+dirs_name
                 for path in dirs_list:
+                    path = self.expand(path)
+                    if path.startswith("/"):
+                        path = path[1:]
                     yield "+"+path
             if files_list:
-                yield next+files_name
+                yield nextfile+files_name
                 for path in files_list:
+                    path = self.expand(path)
+                    if path.startswith("/"):
+                        path = path[1:]
                     yield "+"+path
-    def debian_changelog(self, next = NEXT):
-        name = self.expand(self.var.get("name"))
-        version = self.expand(self.var.get("version"))
-        packager = self.expand(self.var.get("packager"))
+        if docs:
+            yield nextfile+"docs"
+            for doc in docs:
+                for path in doc.split(" "):
+                    path = self.expand(path.strip())
+                    if path.startswith("/"):
+                        path = path[1:]
+                    if path:
+                        yield "+"+path
+    def debian_changelog(self, nextfile = _nextfile):
+        name = self.expand(self.get("name"))
+        version = self.expand(self.get("version"))
+        packager = self.expand(self.get("packager"))
         promote = self.promote
         urgency = self.urgency
-        yield next+"debian/changelog"
+        yield nextfile+"debian/changelog"
         yield "+%s (%s) %s; urgency=%s" % (name, version, promote, urgency)
         yield "+"
         yield "+  * generated OBS deb build"
         yield "+"
         yield "+ -- %s  Mon, 25 Dec 2007 10:50:38 +0100" % (packager)
-    def debian_rules(self, next = NEXT):
-        yield next+"debian/rules"
+    def debian_rules(self, nextfile = _nextfile):
+        yield nextfile +"debian/compat"
+        yield "+%s" % self.debhelper_compat
+        yield nextfile+"debian/rules"
         yield "+#!/usr/bin/make -f"
         yield "+# -*- makefile -*-"
         yield "+# Uncomment this to turn on verbose mode."
@@ -663,10 +811,11 @@ class RpmSpecToDebianControl:
         yield "+       INSTALL_PROGRAM += -s"
         yield "+endif"
         yield "+"
-        for var, value in self.var.items():
-            if var.startswith("_"):
+        for name in self.has_names():
+            if name.startswith("_"):
+                value = self.get(name)
                 value2 = re.sub(r"[%][{](\w+)[}]", r"$(\1)", value)
-                yield "+%s=%s" % (var, value2)
+                yield "+%s=%s" % (name, value2)
         yield "+"
         yield "+configure: configure-stamp"
         yield "+configure-stamp:"
@@ -732,6 +881,11 @@ class RpmSpecToDebianControl:
         yield "+.PHONY: build clean binary-indep binary-arch binary install"
     def deb_script(self, section):
         script = self.packages["%{name}"].get(section, "")
+        on_ifelse_if = re.compile(r"\s*if\s+.*$")
+        on_ifelse_then = re.compile(r".*;\s*then\s*$")
+        on_ifelse_else = re.compile(r"\s*else\s*$|.*;\s*else\s*$")
+        on_ifelse_ends = re.compile(r"\s*fi\s*$|.*;\s*fi\s*$")
+        ifelse = False
         for lines in script:
             for line in lines.split("\n"):
                 if line.startswith("%setup"): 
@@ -742,40 +896,147 @@ class RpmSpecToDebianControl:
                     line = re.sub("[%][{][!][?]_with[^{}]*[}]", "", line)
                     if old == line:
                         break
-                line = line.replace("%buildroot", "$(CURDIR)/debian/tmp")
-                line = line.replace("%{buildroot}", "$(CURDIR)/debian/tmp")
+                # line = line.replace("%buildroot", "$(CURDIR)/debian/tmp")
+                # line = line.replace("%{buildroot}", "$(CURDIR)/debian/tmp")
                 line = line.replace("$RPM_OPT_FLAGS", "$(CFLAGS)")
                 line = line.replace("%{?jobs:-j%jobs}", "")
-                for name in self.commands:
-                    command = self.commands[name]
-                    line = line.replace(name, command)
-                for name in self.var.keys():
-                    if name.startswith("_"):
-                        line = re.sub(r"[%%][{]%s[}]" % name, "$(%s)" % name, line)
-                        line = re.sub(r"[%%]%s\b" % name, "$(%s)" % name, line)
+                old = line
+                for name in self.has_names():
+                    if "$(" in self.get(name):
+                        # debian_special expands
+                        value = self.get(name)
+                        line = re.sub(r"[%%][{]%s[}]" % name, value, line)
+                        line = re.sub(r"[%%]%s\b" % name, value, line)
+                    elif name.startswith("_"):
+                        # rpm_macros expands
+                        value = "$(%s)" % name
+                        line = re.sub(r"[%%][{]%s[}]" % name, value, line)
+                        line = re.sub(r"[%%]%s\b" % name, value, line)
+                    else:
+                        value = self.expand("%"+name)
+                        line = re.sub(r"[%%][{]%s[}]" % name, value, line)
+                        line = re.sub(r"[%%]%s\b" % name, value, line)
+                line = re.sub(r"[%][{][?]\w+[}]", '', line)
+                if old != line:
+                    _log.debug(" -%s", old)
+                    _log.debug(" +%s", line)
+                found = re.search(r"[%]\w+\b", line)
+                if found:
+                    here = found.group(0)
+                    _log.warning("unexpanded '%s' found:\n %s", here, line)
+                found = re.search(r"[%][{][!?]*\w+[:}]", line)
+                if found:
+                    here = found.group(0)
+                    _log.warning("unexpanded '%s' found:\n %s", here, line)
                 if line.strip() == "rm -rf $(CURDIR)/debian/tmp":
                     if section != "%clean":
                         _log.warning("found rm -rf %%buildroot in section %s (should only be in %%clean)", section)
+                # ifelse handling
+                found_ifelse_if = on_ifelse_if.match(line)
+                found_ifelse_then = on_ifelse_then.match(line)
+                found_ifelse_else = on_ifelse_else.match(line)
+                found_ifelse_ends = on_ifelse_ends.match(line)
+                if found_ifelse_if and not found_ifelse_then:
+                    _log.error("'if'-line without '; then' -> not supported\n %s", line)
+                    ifelse = True
+                elif found_ifelse_then:
+                    line = line + " \\"
+                    ifelse = True
+                elif found_ifelse_else:
+                    line = line + " \\"
+                    if not ifelse:
+                        _log.error("'else' outside ';then'-block")
+                elif found_ifelse_ends:
+                    ifelse = False
+                elif ifelse:
+                    if not line.strip().endswith("\\"):
+                        line += "; \\"
                 if line.strip():
                     yield line
-    def debian_patches(self, next = NEXT):
+    def debian_scripts(self, nextfile = _nextfile):
+        preinst = """
+        if   [ "install" = "$1" ]; then  shift ; set -- "0" "$@"
+        elif [ "update" = "$1" ]; then   shift ; set -- "1" "$@"
+        fi
+        """
+        postinst = """
+        if   [ "configure" = "$1" && "." = ".$2" ]; then  shift ; set -- "1" "$@"
+        elif [ "configure" = "$1" && "." != ".$2" ]; then shift ; set -- "2" "$@"
+        fi
+        """
+        prerm = """
+        if   [ "remove" = "$1" ]; then  shift ; set -- "1" "$@"
+        elif [ "upgrade" = "$1" ]; then shift ; set -- "2" "$@"
+        fi
+        """
+        postrm = """
+        if   [ "remove" = "$1" ]; then  shift ; set -- "0" "$@"
+        elif [ "upgrade" = "$1" ]; then shift ; set -- "1" "$@"
+        fi
+        """
+        mapped = { 
+                  "preinst" : preinst,
+                  "postinst" : postinst,
+                  "prerm" : prerm,
+                  "postrm" : postrm,
+                  }
+        
+        sections = [("preinst", "%pre"), ("postinst","%post"),
+                    ("prerm", "%preun"), ("postrm","%postun")] 
+        for deb_package, package in sorted(self.deb_packages2()):
+            for deb_section, section in sections:
+                scripts = self.packages[package].get(section, "")
+                if scripts:
+                    yield nextfile+"%s.%s" %(deb_package, deb_section)
+                    yield "+#! /bin/sh"
+                    for line in mapped[deb_section].split("\n"):
+                        if line.strip():
+                            yield "+"+line.strip()
+                    yield "+" 
+                    if not isinstance(scripts, list):
+                        scripts = [ scripts ]
+                    for script in scripts:
+                        for line in script.split("\n"):
+                            yield "+"+self.expand(line)
+    def debian_patches(self, nextfile = _nextfile):
         patches = []
-        for patch in self.var.get("patch", []):
+        for n in xrange(1,100):
+            source = self.get("source%i" % n)
+            if source:
+                try:
+                    source = os.path.basename(source) # strip any URL prefix
+                    _log.debug("append source%i '%s' as a patch", n, source)
+                    if source in [ "format" ]:
+                        _log.fatal("ignored source%i: %s -> conflict with debian/source/format", n, source)
+                        continue
+                    sourcepath = "debian/source/"+source
+                    textfile = open(source)
+                    yield nextfile+sourcepath
+                    for line in textfile:
+                        yield "+"+line
+                    textfile.close()
+                    # patches.append(source) -> do not do this anymore
+                    self.set("SOURCE%i" % n, "$(CURDIR)/"+sourcepath, "source")
+                except Exception, e:
+                    _log.error("append source%i '%s' failed:\n %s", n, source, e)
+        patch = self.get("patch")
+        if patch:
             patches.append(patch)
         for n in xrange(100):
-            for patch in self.var.get("patch%i" % n, []):
+            patch = self.get("patch%i" % n)
+            if patch:
                 patches.append(patch)
         if patches:
-            yield next+"debian/patches/series"
+            yield nextfile+"debian/patches/series"
             for patch in patches:
                 yield "+"+patch
             for patch in patches:
-                yield next+"debian/patches/"+patch
+                yield nextfile+"debian/patches/"+patch
                 for line in open(patch):
                     yield "+"+line
         else:
             _log.info("no patches -> no debian/patches/series")
-        yield next+"debian/source/format"
+        yield nextfile+"debian/source/format"
         yield "+"+self.format
     def p(self, subdir, patch):
         if "3." in self.format or self.debtransform:
@@ -784,16 +1045,17 @@ class RpmSpecToDebianControl:
             return "%s/%s" % (subdir, patch)
     def debian_diff(self):
         for deb in (self.debian_control, self.debian_copyright, self.debian_install,
-                    self.debian_changelog, self.debian_rules, self.debian_patches):
+                    self.debian_changelog, self.debian_patches, self.debian_rules, 
+                    self.debian_scripts):
             src = self.deb_src()
             old = src+".orig"
             patch = None
             lines = []
-            for line in deb(NEXT):
+            for line in deb(_nextfile):
                 if isinstance(line, tuple):
                     _log.fatal("?? %s %s", deb, line)
                     line = " ".join(line)
-                if line.startswith(NEXT):
+                if line.startswith(_nextfile):
                     if patch:
                         yield "--- %s" % self.p(old, patch)
                         yield "+++ %s" % self.p(src, patch)
@@ -801,7 +1063,7 @@ class RpmSpecToDebianControl:
                         for plus in lines:
                             yield plus
                     lines = []
-                    patch = line[len(NEXT):]
+                    patch = line[len(_nextfile):]
                 else:
                     lines += [ line ]
             # end of deb
@@ -821,7 +1083,7 @@ class RpmSpecToDebianControl:
         try:
             count = 0
             for line in self.debian_dsc(into = into):
-                if line.startswith(NEXT):
+                if line.startswith(_nextfile):
                     continue
                 f.write(line[1:]+"\n")
                 count +=1
@@ -905,8 +1167,7 @@ class RpmSpecToDebianControl:
             return "written '%s'" % filepath
         elif sourcefile.endswith(".tar.bz2"):
             _log.info("recompress %s to %s", sourcefile, filename)
-            import bz2
-            import gzip
+            import bz2 #@UnresolvedImport
             gz = gzip.GzipFile(filepath, "w")
             bz = bz2.BZ2File(sourcefile, "r")
             gz.write(bz.read())
@@ -929,6 +1190,7 @@ _o.add_option("-2","--packages",action="count", help="show the package settings 
 _o.add_option("-x","--extract", action="count", help="run dpkg-source -x after generation")
 _o.add_option("-b","--build", action="count", help="run dpkg-source -b after generation")
 _o.add_option("--format",metavar=FORMAT, help="specify debian/source/format affecting generation")
+_o.add_option("--debhelper",metavar=debhelper_compat, help="specify debian/compat debhelper level")
 _o.add_option("--no-debtransform",action="count", help="disable dependency on OBS debtransform")
 _o.add_option("--debtransform",action="count", help="enable dependency on OBS debtransform (%default)", default = debtransform)
 _o.add_option("--urgency", metavar=urgency, help="set urgency level for debian/changelog")
@@ -936,6 +1198,7 @@ _o.add_option("--promote", metavar=promote, help="set distribution level for deb
 _o.add_option("-C","--debian-control",action="count", help="output for the debian/control file")
 _o.add_option("-L","--debian-copyright",action="count", help="output for the debian/copyright file")
 _o.add_option("-I","--debian-install",action="count", help="output for the debian/*.install files")
+_o.add_option("-S","--debian-scripts",action="count", help="output for the postinst/prerm scripts")
 _o.add_option("-H","--debian-changelog",action="count", help="output for the debian/changelog file")
 _o.add_option("-R","--debian-rules",action="count", help="output for the debian/rules")
 _o.add_option("-P","--debian-patches",action="count", help="output for the debian/patches/*")
@@ -979,10 +1242,12 @@ if __name__ == "__main__":
         if arg.endswith(".spec"):
             spec = arg[:-(len(".spec"))]
     done = 0
-    if opts.no_debtransform:
-        work.debtransform = False
     if opts.debtransform:
         work.debtransform = True
+    if opts.no_debtransform:
+        work.debtransform = False
+    if opts.debhelper:
+        work.debhelper_compat = opts.debhelper
     if opts.urgency:
         work.urgency = opts.urgency
     if opts.promote:
@@ -990,8 +1255,9 @@ if __name__ == "__main__":
     if opts.vars:
         done += opts.vars
         print "# have %s variables" % len(work.var)
-        for name in sorted(work.var):
-            print " %s='%s'" % (name, work.var[name])
+        for name in sorted(work.has_names()):
+            typed = work.typed[name]
+            print "%%%s %s %s" % (typed, name, work.get(name))
     else:
         _log.log(HINT, "have %s variables (use -1 to show them)" % len(work.var))
     if opts.packages:
@@ -1026,6 +1292,10 @@ if __name__ == "__main__":
     if opts.debian_patches:
         done += opts.debian_patches
         for line in work.debian_patches():
+            print line
+    if opts.debian_scripts:
+        done += opts.debian_scripts
+        for line in work.debian_scripts():
             print line
     if opts.debian_dsc:
         done += opts.debian_dsc
@@ -1072,7 +1342,7 @@ if __name__ == "__main__":
         _log.log(HINT, cmd)
         status, output = commands.getstatusoutput(cmd)
         if status:
-            _log.fatal("dpkg-source -x failed with %s#%s:\n%s", status>>8, status&255, output)
+            _log.fatal("dpkg-source -x failed with %s#%s:\n %s", status>>8, status&255, output)
         else:
             _log.info("%s", output)
     if opts.build:
@@ -1080,7 +1350,7 @@ if __name__ == "__main__":
         _log.log(HINT, cmd)
         status, output = commands.getstatusoutput(cmd)
         if status:
-            _log.fatal("dpkg-source -b failed with %s#%s:\n%s", status>>8, status&255, output)
+            _log.fatal("dpkg-source -b failed with %s#%s:\n %s", status>>8, status&255, output)
         else:
             _log.info("%s", output)
             
