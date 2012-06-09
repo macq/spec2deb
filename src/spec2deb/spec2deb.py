@@ -44,10 +44,10 @@ if os.path.isdir(".osc"):
 #       and run them in your sources directory (*tar, *.spec,*.dsc) 
 #       (rm -rf x; mkdir x; debtransform . *.dsc x/; cd x; dpkg-source -x *.dsc)
 
-FORMAT = "1.0" # "2.0" # "3.0 (quilt)" # 
 _nextfile = "--- " # mark the start of the next file during diff generation
 
-_formats = { 
+source_format = "1.0" # "2.0" # "3.0 (quilt)" #
+_source_formats = { 
     "1" : "1.0", 
     "1.0" : "1.0",
     "3" : "3.0 (quilt)", 
@@ -122,7 +122,7 @@ class RpmSpecToDebianControl:
         self.promote = promote
         self.standards_version = standards_version
         self.debhelper_compat = debhelper_compat
-        self.format = FORMAT
+        self.source_format = source_format
         self.debtransform = debtransform
         self.scan_macros(usr_lib_rpm_macros, "default")
         self.scan_macros(debian_special_macros, "debian")
@@ -161,12 +161,12 @@ class RpmSpecToDebianControl:
         if not self.states:
             return None
         return self.states[0]
-    def set_format(self, value):
+    def set_source_format(self, value):
         if not value:
             pass
-        elif value in _formats:
-            self.format = _formats[value]
-            _log.info("using source format '%s'" % self.format)
+        elif value in _source_formats:
+            self.source_format = _source_formats[value]
+            _log.info("using source format '%s'" % self.source_format)
         else:
             _log.fatal("unknown source format: '%s'" % value)
     def new_state(self, state):
@@ -608,7 +608,7 @@ class RpmSpecToDebianControl:
         _log.error("no %setup in %prep section found")
     def debian_dsc(self, nextfile = _nextfile, into = None):
         yield nextfile+"debian/dsc"
-        yield "+Format: %s" % self.format
+        yield "+Format: %s" % self.source_format
         sourcefile = self.deb_sourcefile()
         source = self.deb_source(sourcefile)
         yield "+Source: %s" % self.expand(source)
@@ -1040,9 +1040,9 @@ class RpmSpecToDebianControl:
         else:
             _log.info("no patches -> no debian/patches/series")
         yield nextfile+"debian/source/format"
-        yield "+"+self.format
+        yield "+"+self.source_format
     def p(self, subdir, patch):
-        if "3." in self.format or self.debtransform:
+        if "3." in self.source_format or self.debtransform:
             return patch
         else:
             return "%s/%s" % (subdir, patch)
@@ -1192,7 +1192,7 @@ _o.add_option("-1","--vars",action="count", help="show the variables after parsi
 _o.add_option("-2","--packages",action="count", help="show the package settings after parsing")
 _o.add_option("-x","--extract", action="count", help="run dpkg-source -x after generation")
 _o.add_option("-b","--build", action="count", help="run dpkg-source -b after generation")
-_o.add_option("--format",metavar=FORMAT, help="specify debian/source/format affecting generation")
+_o.add_option("--format",metavar=source_format, help="specify debian/source/format affecting generation")
 _o.add_option("--debhelper",metavar=debhelper_compat, help="specify debian/compat debhelper level")
 _o.add_option("--no-debtransform",action="count", help="disable dependency on OBS debtransform")
 _o.add_option("--debtransform",action="count", help="enable dependency on OBS debtransform (%default)", default = debtransform)
@@ -1221,7 +1221,7 @@ if __name__ == "__main__":
     DONE = logging.INFO + 5; logging.addLevelName(DONE, "DONE")
     HINT = logging.INFO - 5; logging.addLevelName(HINT, "HINT")
     work = RpmSpecToDebianControl()
-    work.set_format(opts.format)
+    work.set_source_format(opts.format)
     spec = None
     if not args:
         specs = glob.glob("*.spec")
@@ -1313,7 +1313,7 @@ if __name__ == "__main__":
         if not opts.dsc:
             opts.dsc = spec+".dsc"
         if not opts.diff:
-            if "3." in work.format:
+            if "3." in work.source_format:
                 opts.diff = "%s_%s-0.debian.tar.gz" % (work.deb_source(), work.deb_version())
             else:
                 opts.diff = "%s_%s-0.diff.gz" % (work.deb_source(), work.deb_version())
@@ -1326,7 +1326,7 @@ if __name__ == "__main__":
         auto = True
         if work.debtransform:
             work.debian_file = "debian.tar.gz"
-        elif "3." in work.format:
+        elif "3." in work.source_format:
             work.debian_file = spec+".debian.tar.gz"
         else:
             work.debian_file = spec+".debian.diff.gz"
