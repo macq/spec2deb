@@ -120,6 +120,7 @@ class RpmSpecToDebianControl:
         self.urgency = urgency
         self.promote = promote
         self.standards_version = standards_version
+        self.debhelper_compat = debhelper_compat
         self.format = FORMAT
         self.debtransform = debtransform
         self.scan_macros(usr_lib_rpm_macros, "default")
@@ -565,7 +566,7 @@ class RpmSpecToDebianControl:
             deb_package = string.lower(self.expand(deb_package))
             yield self.package_mapping(deb_package), package
     def deb_build_depends(self):
-        depends = [ "debhelper (>= 7)" ]
+        depends = [ "debhelper (>= %s)" % self.debhelper_compat ]
         for package in self.packages:
             for buildrequires in self.packages[package].get("buildrequires", []):
                 depend = self.deb_requires(buildrequires)
@@ -784,7 +785,7 @@ class RpmSpecToDebianControl:
         yield "+ -- %s  Mon, 25 Dec 2007 10:50:38 +0100" % (packager)
     def debian_rules(self, nextfile = _nextfile):
         yield nextfile +"debian/compat"
-        yield "+%s" % debhelper_compat
+        yield "+%s" % self.debhelper_compat
         yield nextfile+"debian/rules"
         yield "+#!/usr/bin/make -f"
         yield "+# -*- makefile -*-"
@@ -1156,7 +1157,7 @@ _o.add_option("-2","--packages",action="count", help="show the package settings 
 _o.add_option("-x","--extract", action="count", help="run dpkg-source -x after generation")
 _o.add_option("-b","--build", action="count", help="run dpkg-source -b after generation")
 _o.add_option("--format",metavar=FORMAT, help="specify debian/source/format affecting generation")
-_o.add_option("--compat",metavar=debhelper_compat, help="specify debian/compat debhelper level")
+_o.add_option("--debhelper",metavar=debhelper_compat, help="specify debian/compat debhelper level")
 _o.add_option("--no-debtransform",action="count", help="disable dependency on OBS debtransform")
 _o.add_option("--debtransform",action="count", help="enable dependency on OBS debtransform (%default)", default = debtransform)
 _o.add_option("--urgency", metavar=urgency, help="set urgency level for debian/changelog")
@@ -1212,6 +1213,8 @@ if __name__ == "__main__":
         work.debtransform = True
     if opts.no_debtransform:
         work.debtransform = False
+    if opts.debhelper:
+        work.debhelper_compat = opts.debhelper
     if opts.urgency:
         work.urgency = opts.urgency
     if opts.promote:
