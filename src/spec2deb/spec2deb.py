@@ -44,6 +44,14 @@ if os.path.isdir(".osc"):
 #       (rm -rf x; mkdir x; debtransform . *.dsc x/; cd x; dpkg-source -x *.dsc)
 
 _nextfile = "--- " # mark the start of the next file during diff generation
+default_rpm_group = "System/Libraries"
+# debian policy: Orphaned packages should have their Maintainer control field 
+# set to Debian QA Group <packages@qa.debian.org>
+default_rpm_packager = "unknown <unknown@debian.org>"
+default_rpm_license = "unknown"
+package_architecture = "any"
+package_importance = "optional"
+_package_importances = [ "required", "important", "standard", "optional", "extra"]
 
 source_format = "1.0" # "2.0" # "3.0 (quilt)" #
 _source_formats = { 
@@ -119,6 +127,7 @@ class RpmSpecToDebianControl:
         self.typed = {}
         self.urgency = urgency
         self.promote = promote
+        self.package_importance = package_importance
         self.standards_version = standards_version
         self.debhelper_compat = debhelper_compat
         self.source_format = source_format
@@ -168,6 +177,14 @@ class RpmSpecToDebianControl:
             _log.info("using source format '%s'" % self.source_format)
         else:
             _log.fatal("unknown source format: '%s'" % value)
+    def set_package_importance(self, value):
+        if not value:
+            pass
+        elif value in _package_importances:
+            self.package_importance = value
+            _log.info("using package importance '%s'" % self.package_importance)
+        else:
+            _log.fatal("unknown package_importance: '%s'" % value)
     def new_state(self, state):
         if not self.states:
             self.states = [ "" ]
@@ -648,7 +665,7 @@ class RpmSpecToDebianControl:
         yield "+Source: %s" % self.expand(source)
         binaries = list(self.deb_packages())
         yield "+Binary: %s" % ", ".join(binaries)
-        yield "+Architecture: %s" % "any"
+        yield "+Architecture: %s" % package_architecture
         version = self.get("version","0")+"-"+self.get("revision","0")
         yield "+Version: %s" % version
         yield "+Maintainer: %s" % self.get("packager","?")
@@ -710,10 +727,10 @@ class RpmSpecToDebianControl:
             prefix = ""
     def debian_control(self, nextfile = _nextfile):
         yield nextfile+"debian/control"
-        group = self.get("group","System/Libraries")
+        group = self.get("group", default_rpm_group)
         section = self.group2section(group)
-        yield "+Priority: %s" % "optional"
-        yield "+Maintainer: %s" % self.get("packager","?")
+        yield "+Priority: %s" % self.package_importance
+        yield "+Maintainer: %s" % self.get("packager", default_rpm_packager)
         source = self.deb_source()
         yield "+Source: %s" % self.expand(source)
         depends = list(self.deb_build_depends())
@@ -723,7 +740,7 @@ class RpmSpecToDebianControl:
         yield "+"
         for deb_package, package in sorted(self.deb_packages2()):
             yield "+Package: %s" % deb_package
-            group = self.packages[package].get("group", "System/Libraries")
+            group = self.packages[package].get("group", default_rpm_group)
             section = self.group2section(group)
             yield "+Section: %s" % section
             yield "+Architecture: %s" % "any"
@@ -750,7 +767,7 @@ class RpmSpecToDebianControl:
             yield "+"
     def debian_copyright(self, nextfile = _nextfile):
         yield nextfile+"debian/copyright"
-        yield "+License: %s" % self.get("license","")
+        yield "+License: %s" % self.get("license", default_rpm_license)
     def debian_install(self, nextfile = _nextfile):
         docs = []
         for deb_package, package in sorted(self.deb_packages2()):
@@ -1232,6 +1249,7 @@ _o.add_option("--no-debtransform",action="count", help="disable dependency on OB
 _o.add_option("--debtransform",action="count", help="enable dependency on OBS debtransform (%default)", default = debtransform)
 _o.add_option("--urgency", metavar=urgency, help="set urgency level for debian/changelog")
 _o.add_option("--promote", metavar=promote, help="set distribution level for debian/changelog")
+_o.add_option("--importance", metavar=package_importance, help="set package priority for the debian/control file")
 _o.add_option("-C","--debian-control",action="count", help="output for the debian/control file")
 _o.add_option("-L","--debian-copyright",action="count", help="output for the debian/copyright file")
 _o.add_option("-I","--debian-install",action="count", help="output for the debian/*.install files")
@@ -1279,6 +1297,8 @@ if __name__ == "__main__":
         if arg.endswith(".spec"):
             spec = arg[:-(len(".spec"))]
     done = 0
+    if opts.importance:
+        work.set_package_importance(opts.importance)
     if opts.debtransform:
         work.debtransform = True
     if opts.no_debtransform:
