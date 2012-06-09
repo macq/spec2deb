@@ -20,6 +20,7 @@ import logging
 import commands
 import glob
 import sys
+import random
 
 _log = logging.getLogger(__name__)
 urgency = "low"
@@ -511,20 +512,23 @@ class RpmSpecToDebianControl:
         on_optional_name = re.compile(r"[%][{][?](\w+)[}]")
         for _ in xrange(100):
             oldtext = text
+            text = text.replace("%%", "\1")
             for found in on_plain_name.finditer(text):
                 name, = found.groups()
                 if self.has(name):
                     value = self.get(name)
                     text = re.sub("%"+name+"\\b", value, text)
                 else:
-                    _log.error("unable to expand %%%s in:\n %s", name, orig)
+                    _log.error("unable to expand %%%s in:\n %s\n %s", name, orig, text)
+            text = text.replace("%%", "\1")
             for found in on_required_name.finditer(text):
                 name, = found.groups()
                 if self.has(name):
                     value = self.get(name)
                     text = re.sub("%{"+name+"}", value , text)
                 else:
-                    _log.error("unable to expand %%{%s} in:\n %s", name, orig)
+                    _log.error("unable to expand %%{%s} in:\n %s\n %s", name, orig, text)
+            text = text.replace("%%", "\1")
             for found in on_optional_name.finditer(text):
                 name, = found.groups()
                 if self.has(name):
@@ -532,6 +536,7 @@ class RpmSpecToDebianControl:
                     text = re.sub("%{?"+name+"}", value, text)
                 else:
                     _log.debug("expand optional %%{?%s} to '' in: '%s'", name, orig)
+            text = text.replace("\1", "%%")
             if oldtext == text:
                 break
         if "$(" in text and orig not in [ "%buildroot", "%__make" ]:
