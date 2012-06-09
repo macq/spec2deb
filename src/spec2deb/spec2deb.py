@@ -280,7 +280,7 @@ class RpmSpecToDebianControl:
         self.new_state("changelog")
     def endof_changelog(self):
         self.append_setting(self.section, self.sectiontext)
-    on_rules = re.compile(r"%(prep|build|install|check|clean)(?:\s+(-.*))?")
+    on_rules = re.compile(r"%(prep|build|install|check|clean)\b(?:\s+(-.*))?")
     def start_rules(self, found_rules):
         rule, options = found_rules.groups()
         self.new_package("", options)
@@ -289,7 +289,7 @@ class RpmSpecToDebianControl:
         self.new_state("rules")
     def endof_rules(self):
         self.append_setting(self.section, self.sectiontext)
-    on_scripts = re.compile(r"%(post|postun|pre|preun)(?:\s+(\w\S+))?(?:\s+(-.*))?")
+    on_scripts = re.compile(r"%(post|postun|pre|preun)\b(?:\s+(\w\S+))?(?:\s+(-.*))?")
     def start_scripts(self, found_scripts):
         rule, package, options = found_scripts.groups()
         self.new_package(package, options)
@@ -696,6 +696,7 @@ class RpmSpecToDebianControl:
         yield next+"debian/copyright"
         yield "+License: %s" % self.get("license","")
     def debian_install(self, next = NEXT):
+        docs = []
         for deb_package, package in sorted(self.deb_packages2()):
             files_name =  "debian/%s.install" % deb_package
             dirs_name =  "debian/%s.dirs" % deb_package
@@ -711,6 +712,8 @@ class RpmSpecToDebianControl:
                         if path:
                             files_list.append(path)
                     elif path.startswith("%doc"):
+                        path = path[len("%doc"):].strip()
+                        docs += [ path ]
                         continue
                     elif path.startswith("%dir"):
                         path = path[len("%dir"):].strip()
@@ -736,6 +739,14 @@ class RpmSpecToDebianControl:
             if files_list:
                 yield next+files_name
                 for path in files_list:
+                    path = self.expand(path)
+                    if path.startswith("/"):
+                        path = path[1:]
+                    yield "+"+path
+        if docs:
+            yield next+"docs"
+            for path in docs:
+                if True:
                     path = self.expand(path)
                     if path.startswith("/"):
                         path = path[1:]
@@ -892,6 +903,51 @@ class RpmSpecToDebianControl:
                         _log.warning("found rm -rf %%buildroot in section %s (should only be in %%clean)", section)
                 if line.strip():
                     yield line
+    def debian_scripts(self, next = NEXT):
+        preinst = """
+        if   [ "install" = "$1" ]; then  shift ; set -- "0" "$@"
+        elif [ "update" = "$1" ]; then   shift ; set -- "1" "$@"
+        fi
+        """
+        postinst = """
+        if   [ "configure" = "$1" && "." = ".$2" ]; then  shift ; set -- "1" "$@"
+        elif [ "configure" = "$1" && "." != ".$2" ]; then shift ; set -- "2" "$@"
+        fi
+        """
+        prerm = """
+        if   [ "remove" = "$1" ]; then  shift ; set -- "1" "$@"
+        elif [ "upgrade" = "$1" ]; then shift ; set -- "2" "$@"
+        fi
+        """
+        postrm = """
+        if   [ "remove" = "$1" ]; then  shift ; set -- "0" "$@"
+        elif [ "upgrade" = "$1" ]; then shift ; set -- "1" "$@"
+        fi
+        """
+        mapped = { 
+                  "preinst" : preinst,
+                  "postinst" : postinst,
+                  "prerm" : prerm,
+                  "postrm" : postrm,
+                  }
+        
+        sections = [("preinst", "%pre"), ("postinst","%post"),
+                    ("prerm", "%preun"), ("postrm","%postun")] 
+        for deb_package, package in sorted(self.deb_packages2()):
+            for deb_section, section in sections:
+                scripts = self.packages["%{name}"].get(section, "")
+                if scripts:
+                    yield next+"%s.%s" %(deb_package, deb_section)
+                    yield "#! /bin/sh"
+                    for line in mapped[deb_section].split("\n"):
+                        if line.strip():
+                            yield "+"+line.strip()
+                    yield "+" 
+                    if not isinstance(scripts, list):
+                        scripts = [ scripts ]
+                    for script in scripts:
+                        for line in script.split("\n"):
+                            yield "+"+self.expand(line)
     def debian_patches(self, next = NEXT):
         patches = []
         for n in xrange(1,100):
@@ -933,7 +989,8 @@ class RpmSpecToDebianControl:
             return "%s/%s" % (subdir, patch)
     def debian_diff(self):
         for deb in (self.debian_control, self.debian_copyright, self.debian_install,
-                    self.debian_changelog, self.debian_rules, self.debian_patches):
+                    self.debian_changelog, self.debian_rules, self.debian_patches,
+                    self.debian_scripts):
             src = self.deb_src()
             old = src+".orig"
             patch = None
@@ -1085,6 +1142,7 @@ _o.add_option("--promote", metavar=promote, help="set distribution level for deb
 _o.add_option("-C","--debian-control",action="count", help="output for the debian/control file")
 _o.add_option("-L","--debian-copyright",action="count", help="output for the debian/copyright file")
 _o.add_option("-I","--debian-install",action="count", help="output for the debian/*.install files")
+_o.add_option("-S","--debian-scripts",action="count", help="output for the postinst/prerm scripts")
 _o.add_option("-H","--debian-changelog",action="count", help="output for the debian/changelog file")
 _o.add_option("-R","--debian-rules",action="count", help="output for the debian/rules")
 _o.add_option("-P","--debian-patches",action="count", help="output for the debian/patches/*")
@@ -1176,6 +1234,10 @@ if __name__ == "__main__":
     if opts.debian_patches:
         done += opts.debian_patches
         for line in work.debian_patches():
+            print line
+    if opts.debian_scripts:
+        done += opts.debian_scripts
+        for line in work.debian_scripts():
             print line
     if opts.debian_dsc:
         done += opts.debian_dsc
