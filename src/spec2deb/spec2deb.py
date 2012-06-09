@@ -127,7 +127,7 @@ class RpmSpecToDebianControl:
         return default
     def set(self, name, value, typed):
         if name in self.var:
-            if self.typed[name] == "fixed":
+            if self.typed[name] == "debian":
                 _log.debug("ignore %s var '%s'", self.typed[name], name)
                 return
             if self.var[name] != value:
@@ -887,6 +887,7 @@ class RpmSpecToDebianControl:
                         value = self.expand("%"+name)
                         line = re.sub(r"[%%][{]%s[}]" % name, value, line)
                         line = re.sub(r"[%%]%s\b" % name, value, line)
+                line = re.sub(r"[%][{][?]\w+[}]", '', line)
                 if old != line:
                     _log.debug(" -%s", old)
                     _log.debug(" +%s", line)
