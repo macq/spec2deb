@@ -1341,6 +1341,7 @@ _o.add_option("-t","--tar",metavar="FILE", help="create an orig.tar.gz copy of r
 _o.add_option("-o","--dsc",metavar="FILE", help="create the debian.dsc descriptor file")
 _o.add_option("-f","--diff",metavar="FILE", help="""create the debian.diff.gz file 
 (depending on the given filename it can also be a debian.tar.gz with the same content)""")
+_o.add_option("--define",metavar="VARIABLE=VALUE", dest="defines", help="Specify a variable value in case spec parsing cannot determine it", action="append", default=[])
 _o.add_option("-d", metavar="sources", help="""create and populate a debian sources
 directory. Automatically sets --dsc and --diff, creates an orig.tar.gz and assumes --no-debtransform""")
 
@@ -1387,6 +1388,9 @@ if __name__ == "__main__":
         work.urgency = opts.urgency
     if opts.promote:
         work.promote = opts.promote 
+    if opts.defines:
+        for name,value in [ valuepair.split('=',1) for valuepair in opts.defines ]:
+            work.set(name, value, "define")
     if opts.vars:
         done += opts.vars
         print "# have %s variables" % len(work.var)
