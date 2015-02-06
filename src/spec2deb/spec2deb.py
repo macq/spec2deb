@@ -10,6 +10,7 @@ Note that the script has some builting "magic" to transform the rpm spec
 it might be failing in your case. And yes ... we take patches.
 """
 
+from optparse import OptionParser
 import re
 import string
 import os.path
@@ -20,6 +21,7 @@ import logging
 import commands
 import glob
 import sys
+import collections
 
 _log = logging.getLogger(__name__)
 urgency = "low"
@@ -63,15 +65,15 @@ _source_formats = {
     "3.0 (quilt)": "3.0 (quilt)"
 }
 
+# %__mkdir_p              /bin/mkdir -p
+# %__ln_s                 ln -s
 usr_lib_rpm_macros = """# copy-n-paste from /usr/lib/rpm/macros
 %_usr                   /usr
 %_usrsrc                %{_usr}/src
 %_var                   /var
 %__cp                   /bin/cp
 %__install              /usr/bin/install
-%__ln_s                 ln -s
 %__mkdir                /bin/mkdir
-%__mkdir_p              /bin/mkdir -p
 %__mv                   /bin/mv
 %__perl                 /usr/bin/perl
 %__python               /usr/bin/python
@@ -100,7 +102,7 @@ usr_lib_rpm_macros = """# copy-n-paste from /usr/lib/rpm/macros
 """
 
 debian_special_macros = """
-%__make                 $(MAKE)
+%__make                 /usr/bin/make
 %buildroot              $(CURDIR)/debian/tmp
 %host                   $(DEB_HOST_GNU_TYPE)
 %host_alias             $(DEB_HOST_GNU_TYPE)
@@ -109,9 +111,11 @@ debian_special_macros = """
 """
 
 known_package_mapping = {
-    "zlib-dev": "zlib1g-dev",
-    "sdl-dev": "libsdl-dev",
+    "zlib-devel": "zlib1g-dev",
+    "sdl-devel": "libsdl-dev",
     "sdl": "libsdl",
+    "libopenssl-devel": "libssl-dev",
+    "libidn-devel": "libidn11-dev"
 }
 
 
@@ -128,6 +132,7 @@ class RpmSpecToDebianControl:
         self.states = []
         self.var = {}
         self.typed = {}
+        self.rpm_macros = []
         self.urgency = urgency
         self.promote = promote
         self.package_importance = package_importance
@@ -143,6 +148,14 @@ class RpmSpecToDebianControl:
 
     def has_names(self):
         return self.var.keys()
+
+    def has_rpm_macros(self):
+        return self.rpm_macros
+
+    def is_default(self, name):
+        if self.has(name) and self.typed[name] == 'default':
+            return True
+        return False
 
     def has(self, name):
         if name in self.var:
@@ -164,6 +177,8 @@ class RpmSpecToDebianControl:
                           typed, name, value, self.var[name])
         self.var[name] = value
         self.typed[name] = typed
+        if typed == "default":
+            self.rpm_macros.append(name)
         return self
 
     def scan_macros(self, text, typed):
@@ -219,25 +234,33 @@ class RpmSpecToDebianControl:
             else:
                 self.package = "%{name}"
         self.packages.setdefault(self.package, {})
+    on_requires = re.compile(r"([\w.+_-]+(\s+(>=|>|<|<=|=|==)\s+[\w.~+_-]+)?)")
 
     def append_setting(self, name, value):
-        self.packages[self.package].setdefault(name, []).append(value.strip())
+        package_sections = ["requires", "buildrequires", "prereq",
+                            "provides", "conflicts", "suggests"]
+        value = value.strip()
+        if name in package_sections:
+            requires = self.on_requires.findall(self.expand(value))
+            for require in requires:
+                self.packages[self.package].setdefault(
+                    name, []).append(require[0])
+        else:
+            self.packages[self.package].setdefault(name, []).append(value)
         # also provide the setting for macro expansion:
-        ignores = ["requires", "buildrequires", "prereq",
-                   "provides", "conflicts", "suggests"]
         if not self.package or self.package == "%{name}":
             if not name.startswith("%"):
                 name1 = string.lower(name)
                 if name1 in ["source", "patch"]:
                     name1 += "0"
-                if name1 not in ignores:
-                    self.set(name1, value.strip(), "package")
+                if name1 not in package_sections:
+                    self.set(name1, value, "package")
             else:
                 _log.debug("ignored to add a setting '%s'", name)
         else:
-            if name not in ignores:
-                _log.debug("ignored to add a setting '%s' from package '%s'",
-                           name, self.package)
+            if name not in package_sections:
+                _log.debug(
+                    "ignored to add a setting '%s' from package '%s'", name, self.package)
 
     def new_section(self, section, text=""):
         self.section = section.strip()
@@ -256,16 +279,31 @@ class RpmSpecToDebianControl:
         name, value = found_setting.groups()
         self.append_setting(string.lower(name), value)
     on_new_if = re.compile(r"%if\b(.*)")
+    on_else = re.compile(r"%else\b(.*)")
     on_end_if = re.compile(r"%endif\b(.*)")
 
     def new_if(self, found_new_if):
         condition, = found_new_if.groups()
-        if "debian" in condition:
+        condition = self.expand(condition)
+        condition_result = False
+        try:
+            condition_result = eval(condition)
+        except SyntaxError:
+            print 'SyntaxError exception during evaluation of ' + condition
+        if condition_result:
             self.states.append("keep-if")
         else:
             self.states.append("skip-if")
 
-    def end_if(self, found_new_if):
+    def new_else(self):
+        if self.states[-1] == "skip-if":
+            self.states[-1] = "keep-if"
+        elif self.states[-1] == "keep-if":
+            self.states[-1] = "skip-if"
+        else:
+            _log.error("unmatched %else with no preceding %if")
+
+    def end_if(self):
         if self.states[-1] == "skip-if":
             self.states = self.states[:-1]
         elif self.states[-1] == "keep-if":
@@ -386,6 +424,7 @@ class RpmSpecToDebianControl:
                 found_default_var1 = self.on_default_var1.match(line)
                 found_default_var2 = self.on_default_var2.match(line)
                 found_new_if = self.on_new_if.match(line)
+                found_else = self.on_else.match(line)
                 found_end_if = self.on_end_if.match(line)
                 found_comment = self.on_comment.match(line)
                 found_variable = self.on_variable.match(line)
@@ -404,8 +443,10 @@ class RpmSpecToDebianControl:
                     self.default_var2(found_default_var2)
                 elif found_new_if:
                     self.new_if(found_new_if)
+                elif found_else:
+                    self.new_else()
                 elif found_end_if:
-                    self.end_if(found_end_if)
+                    self.end_if()
                 elif self.skip_if():
                     continue
                 elif found_variable:
@@ -430,6 +471,7 @@ class RpmSpecToDebianControl:
                     _log.error("%s unmatched line:\n %s", self.state(), line)
             elif self.state() in ["description"]:
                 found_new_if = self.on_new_if.match(line)
+                found_else = self.on_else.match(line)
                 found_end_if = self.on_end_if.match(line)
                 found_package = self.on_package.match(line)
                 found_description = self.on_description.match(line)
@@ -442,8 +484,10 @@ class RpmSpecToDebianControl:
                     self.endof_description()
                 if found_new_if:
                     self.new_if(found_new_if)
+                elif found_else:
+                    self.new_else()
                 elif found_end_if:
-                    self.end_if(found_end_if)
+                    self.end_if()
                 elif self.skip_if():
                     continue
                 elif found_package:
@@ -462,6 +506,7 @@ class RpmSpecToDebianControl:
                     self.append_section(line)
             elif self.state() in ["rules"]:
                 found_new_if = self.on_new_if.match(line)
+                found_else = self.on_else.match(line)
                 found_end_if = self.on_end_if.match(line)
                 found_package = self.on_package.match(line)
                 found_description = self.on_description.match(line)
@@ -474,8 +519,10 @@ class RpmSpecToDebianControl:
                     self.endof_files()
                 if found_new_if:
                     self.new_if(found_new_if)
+                elif found_else:
+                    self.new_else()
                 elif found_end_if:
-                    self.end_if(found_end_if)
+                    self.end_if()
                 elif self.skip_if():
                     continue
                 elif found_package:
@@ -494,6 +541,7 @@ class RpmSpecToDebianControl:
                     self.append_section(line)
             elif self.state() in ["scripts"]:
                 found_new_if = self.on_new_if.match(line)
+                found_else = self.on_else.match(line)
                 found_end_if = self.on_end_if.match(line)
                 found_package = self.on_package.match(line)
                 found_description = self.on_description.match(line)
@@ -506,8 +554,10 @@ class RpmSpecToDebianControl:
                     self.endof_scripts()
                 if found_new_if:
                     self.new_if(found_new_if)
+                elif found_else:
+                    self.new_else()
                 elif found_end_if:
-                    self.end_if(found_end_if)
+                    self.end_if()
                 elif self.skip_if():
                     continue
                 elif found_package:
@@ -526,6 +576,7 @@ class RpmSpecToDebianControl:
                     self.append_section(line)
             elif self.state() in ["files"]:
                 found_new_if = self.on_new_if.match(line)
+                found_else = self.on_else.match(line)
                 found_end_if = self.on_end_if.match(line)
                 found_package = self.on_package.match(line)
                 found_description = self.on_description.match(line)
@@ -538,8 +589,10 @@ class RpmSpecToDebianControl:
                     self.endof_files()
                 if found_new_if:
                     self.new_if(found_new_if)
+                elif found_else:
+                    self.new_else()
                 elif found_end_if:
-                    self.end_if(found_end_if)
+                    self.end_if()
                 elif self.skip_if():
                     continue
                 elif found_package:
@@ -602,7 +655,7 @@ class RpmSpecToDebianControl:
             _log.fatal("UNKNOWN state %s (at end of file)", self.states)
     on_embedded_name = re.compile(r"[%](\w+)\b")
     on_required_name = re.compile(r"[%][{](\w+)[}]")
-    on_optional_name = re.compile(r"[%][{][?](\w+)[}]")
+    on_optional_name = re.compile(r"[%][{]([!]?[?])(\w+):?(\w+)?[}]")
 
     def expand(self, text):
         orig = text
@@ -628,13 +681,22 @@ class RpmSpecToDebianControl:
                         "unable to expand %%{%s} in:\n %s\n %s", name, orig, text)
             text = text.replace("%%", "\1")
             for found in self.on_optional_name.finditer(text):
-                name, = found.groups()
-                if self.has(name):
-                    value = ''
-                    text = re.sub("%{?"+name+"}", value, text)
-                else:
-                    _log.debug(
-                        "expand optional %%{?%s} to '' in: '%s'", name, orig)
+                mark, name, replacement = found.groups()
+
+                to_replace = "%{"
+                to_replace += "\?" if (mark == '?') else "!\?"
+                to_replace += name
+                if (replacement):
+                    to_replace += ":" + replacement
+                to_replace += "}"
+                value = ''
+
+                if (self.has(name) and mark == '?') or (not self.has(name) and mark == '!?'):
+                    value = replacement if replacement else self.get(name)
+                    text = re.sub(to_replace, value, text)
+
+                text = re.sub(to_replace, value, text)
+
             text = text.replace("\1", "%%")
             if oldtext == text:
                 break
@@ -659,21 +721,21 @@ class RpmSpecToDebianControl:
     def _deb_packages2(self):
         for package in sorted(self.packages):
             deb_package = package
-            if deb_package == "%{name}" and len(self.packages) > 1:
-                deb_package = "%{name}-bin"
+#			if deb_package == "%{name}" and len(self.packages) > 1:
+#				deb_package = "%{name}-bin"
             deb_package = self.deb_package_name(self.expand(deb_package))
             yield deb_package, package
 
     def deb_package_name(self, deb_package):
         """ debian.org/doc/debian-policy/ch-controlfields.html##s-f-Source
-            ... must consist only of lower case letters (a-z), digits (0-9),
-            plus (+) and minus (-) signs, and periods (.), must be at least
-            two characters long and must start with an alphanumeric. """
+                ... must consist only of lower case letters (a-z), digits (0-9),
+                plus (+) and minus (-) signs, and periods (.), must be at least
+                two characters long and must start with an alphanumeric. """
         package = string.lower(deb_package).replace("_", "")
-        if package.endswith("-devel"):
-            package = package[:-2]
         if package in known_package_mapping:
             package = known_package_mapping[package]
+        elif package.endswith("-devel"):
+            package = package[:-2]
         return package
 
     def deb_build_depends(self):
@@ -686,7 +748,8 @@ class RpmSpecToDebianControl:
         return depends
 
     def deb_requires(self, requires):
-        withversion = re.match("(\S+)\s+(>=|>|<|<=|==)\s+(\S+)", requires)
+        requires = self.expand(requires)
+        withversion = re.match("(\S+)\s+(>=|>|<|<=|=|==)\s+(\S+)", requires)
         if withversion:
             package, relation, version = withversion.groups()
             deb_package = self.deb_package_name(package)
@@ -710,7 +773,7 @@ class RpmSpecToDebianControl:
         for part in script:
             for line in part.split("\n"):
                 if line.startswith("%setup"):
-                    m = re.search("-n\s+(    \S+)", line)
+                    m = re.search("-n\s+(	 \S+)", line)
                     if m:
                         return m.group(1)
                     return self.deb_source()+"-"+self.deb_version()
@@ -889,8 +952,8 @@ class RpmSpecToDebianControl:
             group = self.packages[package].get("group", default_rpm_group)
             section = self.group2section(group)
             yield "+Section: %s" % section
-            yield "+Architecture: %s" % "any"
-            depends = self.packages[package].get("depends", "")
+            yield "+Architecture: %s" % "all"
+            depends = self.packages[package].get("requires", "")
             replaces = self.packages[package].get("replaces", "")
             conflicts = self.packages[package].get("conflicts", "")
             pre_depends = self.packages[package].get("prereq", "")
@@ -910,7 +973,7 @@ class RpmSpecToDebianControl:
             text = self.packages[package].get("%description", "")
             # yield "+Description: %s" % self.deb_description_from(text)
             for line in self.deb_description_lines(text):
-                yield "+"+line
+                yield "+"+self.expand(line)
             yield "+"
 
     def debian_copyright(self, nextfile=_nextfile):
@@ -994,6 +1057,38 @@ class RpmSpecToDebianControl:
     def debian_rules(self, nextfile=_nextfile):
         yield nextfile + "debian/compat"
         yield "+%s" % self.debhelper_compat
+
+        yield nextfile+"debian/vars"
+        yield "+RPM_BUILD_ROOT=$(pwd)/debian/tmp"
+        for name in self.has_rpm_macros():
+            if name.startswith("_"):
+                value = self.get(name)
+                value2 = re.sub(r"[%][{](\w+)[}]", r"${\1}", value)
+                yield "+%s=%s" % (name, value2)
+        for name in self.has_names():
+            if name.startswith("_") and not self.is_default(name):
+                value = self.get(name)
+                value2 = re.sub(r"[%][{](\w+)[}]", r"${\1}", value)
+                yield "+%s=%s" % (name, value2)
+
+        yield nextfile+"debian/prep.sh"
+        yield "+#!/bin/bash"
+        yield "+. debian/vars"
+        for line in self.deb_script("%prep"):
+            yield "+\t"+line
+
+        yield nextfile+"debian/build.sh"
+        yield "+#!/bin/bash"
+        yield "+. debian/vars"
+        for line in self.deb_script("%build"):
+            yield "+\t"+line
+
+        yield nextfile+"debian/install.sh"
+        yield "+#!/bin/bash"
+        yield "+. debian/vars"
+        for line in self.deb_script("%install"):
+            yield "+\t"+line
+
         yield nextfile+"debian/rules"
         yield "+#!/usr/bin/make -f"
         yield "+# -*- makefile -*-"
@@ -1002,40 +1097,42 @@ class RpmSpecToDebianControl:
         yield "+"
         yield "+# These are used for cross-compiling and for saving the configure script"
         yield "+# from having to guess our platform (since we know it already)"
-        yield "+DEB_HOST_GNU_TYPE   ?= $(shell dpkg-architecture -qDEB_HOST_GNU_TYPE)"
-        yield "+DEB_BUILD_GNU_TYPE  ?= $(shell dpkg-architecture -qDEB_BUILD_GNU_TYPE)"
+        yield "+DEB_HOST_GNU_TYPE	?= $(shell dpkg-architecture -qDEB_HOST_GNU_TYPE)"
+        yield "+DEB_BUILD_GNU_TYPE	?= $(shell dpkg-architecture -qDEB_BUILD_GNU_TYPE)"
         yield "+"
         yield "+"
         yield "+CFLAGS = -Wall -g"
         yield "+"
         yield "+ifneq (,$(findstring noopt,$(DEB_BUILD_OPTIONS)))"
-        yield "+       CFLAGS += -O0"
+        yield "+	   CFLAGS += -O0"
         yield "+else"
-        yield "+       CFLAGS += -O2"
+        yield "+	   CFLAGS += -O2"
         yield "+endif"
         yield "+ifeq (,$(findstring nostrip,$(DEB_BUILD_OPTIONS)))"
-        yield "+       INSTALL_PROGRAM += -s"
+        yield "+	   INSTALL_PROGRAM += -s"
         yield "+endif"
-        yield "+"
-        for name in self.has_names():
-            if name.startswith("_"):
-                value = self.get(name)
-                value2 = re.sub(r"[%][{](\w+)[}]", r"$(\1)", value)
-                yield "+%s=%s" % (name, value2)
+#		yield "+"
+#		for name in self.has_names():
+#			if name.startswith("_"):
+#				value = self.get(name)
+#				value2 = re.sub(r"[%][{](\w+)[}]", r"$(\1)", value)
+#				yield "+%s=%s" % (name, value2)
         yield "+"
         yield "+configure: configure-stamp"
         yield "+configure-stamp:"
         yield "+\tdh_testdir"
-        for line in self.deb_script("%prep"):
-            yield "+\t"+line
+        yield "+\tbash debian/prep.sh"
+#		for line in self.deb_script("%prep"):
+#			yield "+\t"+line
         yield "+\t#"
         yield "+\ttouch configure-stamp"
         yield "+"
         yield "+build: build-stamp"
         yield "+build-stamp: configure-stamp"
         yield "+\tdh_testdir"
-        for line in self.deb_script("%build"):
-            yield "+\t"+line
+        yield "+\tbash debian/build.sh"
+#		for line in self.deb_script("%build"):
+#			yield "+\t"+line
         yield "+\t#"
         yield "+\ttouch build-stamp"
         yield "+"
@@ -1052,13 +1149,14 @@ class RpmSpecToDebianControl:
         yield "+\tdh_prep"
         yield "+\tdh_installdirs"
         yield "+\t# Add here commands to install the package into debian/tmp"
-        # +       $(MAKE) install DESTDIR=$(CURDIR)/debian/tmp
-        for line in self.deb_script("%install"):
-            yield "+\t"+line
+        # +		  $(MAKE) install DESTDIR=$(CURDIR)/debian/tmp
+        yield "+\tbash debian/install.sh"
+#		for line in self.deb_script("%install"):
+#			yield "+\t"+line
         yield "+\t# Move all files in their corresponding package"
         yield "+\tdh_install --list-missing --sourcedir=debian/tmp"
         yield "+\t# empty dependency_libs in .la files"
-        yield "+\tsed -i \"/dependency_libs/ s/'.*'/''/\" `find debian/ -name '*.la'`"
+        yield "+\tfind debian/ -name '*.la' -exec sed -i \"/dependency_libs/ s/'.*'/''/\" {} \;"
         yield "+"
         yield "+# Build architecture-independent files here."
         yield "+binary-indep: build install"
@@ -1068,7 +1166,7 @@ class RpmSpecToDebianControl:
         yield "+binary-arch: build install"
         yield "+\tdh_testdir"
         yield "+\tdh_testroot"
-        yield "+\tdh_installchangelogs ChangeLog"
+#		yield "+\tdh_installchangelogs ChangeLog"
         yield "+\tdh_installdocs"
         yield "+\tdh_installexamples"
         yield "+\tdh_installman"
@@ -1116,7 +1214,7 @@ class RpmSpecToDebianControl:
                         line = re.sub(r"[%%]%s\b" % name, value, line)
                     elif name.startswith("_"):
                         # rpm_macros expands
-                        value = "$(%s)" % name
+                        value = "${%s}" % name
                         line = re.sub(r"[%%][{]%s[}]" % name, value, line)
                         line = re.sub(r"[%%]%s\b" % name, value, line)
                     else:
@@ -1309,7 +1407,7 @@ class RpmSpecToDebianControl:
         return "ERROR", filename
 
     def write_debian_diff(self, filename, into=None):
-        if filename.endswith(".tar.gz"):
+        if filename.endswith(".tar.gz") or filename.endswith(".tgz"):
             return self.write_debian_tar(filename, into=into)
         filepath = os.path.join(into or "", filename)
         if filename.endswith(".gz"):
@@ -1375,10 +1473,13 @@ class RpmSpecToDebianControl:
             tar.close()
         return "ERROR: %s" % filepath
 
-    def write_debian_orig_tar(self, filename, into=None):
+    def write_debian_orig_tar(self, filename, into=None, path=None):
         sourcefile = self.expand(self.deb_sourcefile())
+        if not os.path.isfile(sourcefile):
+            sourcefile = os.path.join(path or "", sourcefile)
+            print "----------------- sourcefile " + sourcefile
         filepath = os.path.join(into or "", filename)
-        if sourcefile.endswith(".tar.gz"):
+        if sourcefile.endswith(".tar.gz") or sourcefile.endswith(".tgz"):
             _log.info("copy %s to %s", sourcefile, filename)
             import shutil
             shutil.copyfile(sourcefile, filepath)
@@ -1455,6 +1556,8 @@ _o.add_option("-f", "--diff", metavar="FILE", help="""create the debian.diff.gz 
 (depending on the given filename it can also be a debian.tar.gz with the same content)""")
 _o.add_option("--define", metavar="VARIABLE=VALUE", dest="defines",
               help="Specify a variable value in case spec parsing cannot determine it", action="append", default=[])
+_o.add_option("-p", metavar="path", dest="path",
+              help="Specify a variable value in case spec parsing cannot determine it")
 _o.add_option("-d", metavar="sources", help="""create and populate a debian sources
 directory. Automatically sets --dsc and --diff, creates an orig.tar.gz and assumes --no-debtransform""")
 
@@ -1489,6 +1592,11 @@ if __name__ == "__main__":
                 "no file arguments given and no *.spec files in the current directory.")
             _log.warning("")
             sys.exit(1)  # nothing was done
+
+    if opts.defines:
+        for name, value in [valuepair.split('=', 1) for valuepair in opts.defines]:
+            work.set(name, value, "define")
+
     for arg in args:
         work.parse(arg)
         if arg.endswith(".spec"):
@@ -1506,9 +1614,6 @@ if __name__ == "__main__":
         work.urgency = opts.urgency
     if opts.promote:
         work.promote = opts.promote
-    if opts.defines:
-        for name, value in [valuepair.split('=', 1) for valuepair in opts.defines]:
-            work.set(name, value, "define")
     if opts.vars:
         done += opts.vars
         print "# have %s variables" % len(work.var)
@@ -1594,7 +1699,8 @@ if __name__ == "__main__":
         _log.log(HINT, "automatically selecting -o %s -f %s",
                  opts.dsc, opts.diff)
     if opts.tar:
-        _log.log(DONE, work.write_debian_orig_tar(opts.tar, into=opts.d))
+        _log.log(DONE, work.write_debian_orig_tar(
+            opts.tar, into=opts.d, path=opts.path))
     if opts.diff:
         _log.log(DONE, work.write_debian_diff(opts.diff, into=opts.d))
     if opts.dsc:
