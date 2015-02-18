@@ -115,7 +115,17 @@ known_package_mapping = {
     "sdl-devel": "libsdl-dev",
     "sdl": "libsdl",
     "libopenssl-devel": "libssl-dev",
-    "libidn-devel": "libidn11-dev"
+    "libidn-devel": "libidn11-dev",
+    "glibc": "libc6",
+    "curl-devel": "libcurl4-openssl-dev",
+    "openssl-devel": "libssl-dev",
+    "pcre-devel": "libpcre3-dev",
+    "tightvnc": "tightvncserver",
+    "boost-devel": "libboost-dev",
+    "gflags-devel": "libgflags-dev",
+    "glog-devel": "libgoogle-glog-dev",
+    "protobuf-devel": "libprotobuf-dev",
+    "gcc-c++": "g++"
 }
 
 
