@@ -155,6 +155,7 @@ class RpmSpecToDebianControl:
         self.cache_packages2 = []
         self.cache_version = None
         self.cache_revision = None
+        self.architecture = package_architecture
 
     def has_names(self):
         return self.var.keys()
@@ -283,6 +284,15 @@ class RpmSpecToDebianControl:
     def save_variable(self, found_variable):
         typed, name, value = found_variable.groups()
         self.set(name.strip(), value.strip(), typed)
+
+    on_architecture = re.compile(r"buildarch\s*:\s*(\S.*)", re.IGNORECASE)
+
+    def save_architecture(self, found_architecture):
+        value, = found_architecture.groups()
+        if value == 'noarch':
+            value = 'all'
+        self.architecture = value
+
     on_setting = re.compile(r"\s*(\w+)\s*:\s*(\S.*)")
 
     def save_setting(self, found_setting):
@@ -438,6 +448,7 @@ class RpmSpecToDebianControl:
                 found_end_if = self.on_end_if.match(line)
                 found_comment = self.on_comment.match(line)
                 found_variable = self.on_variable.match(line)
+                found_architecture = self.on_architecture.match(line)
                 found_setting = self.on_setting.match(line)
                 found_package = self.on_package.match(line)
                 found_description = self.on_description.match(line)
@@ -461,6 +472,8 @@ class RpmSpecToDebianControl:
                     continue
                 elif found_variable:
                     self.save_variable(found_variable)
+                elif found_architecture:
+                    self.save_architecture(found_architecture)
                 elif found_setting:
                     self.save_setting(found_setting)
                 elif found_package:
@@ -768,6 +781,18 @@ class RpmSpecToDebianControl:
             deb_package = self.deb_package_name(requires.strip())
             return deb_package
 
+    def deb_provides(self, provides):
+        provides = self.expand(provides)
+        withversion = re.match(
+            "(\S+)\s+(=>|>=|>|<|=<|<=|=|==)\s+(\S+)", provides)
+        if withversion:
+            package, relation, version = withversion.groups()
+            deb_package = self.deb_package_name(package)
+            return deb_package  # remove version from provides
+        else:
+            deb_package = self.deb_package_name(provides.strip())
+            return deb_package
+
     def deb_sourcefile(self):
         sourcefile = self.get("source", self.get("source0"))
         x = sourcefile.rfind("/")
@@ -813,7 +838,7 @@ class RpmSpecToDebianControl:
         yield "+Source: %s" % self.expand(source)
         binaries = list(self.deb_packages())
         yield "+Binary: %s" % ", ".join(binaries)
-        yield "+Architecture: %s" % package_architecture
+        yield "+Architecture: %s" % self.architecture
         yield "+Version: %s" % self.deb_revision()
         yield "+Maintainer: %s" % self.get("packager", default_rpm_packager)
         yield "+Standards-Version: %s" % self.standards_version
@@ -962,14 +987,18 @@ class RpmSpecToDebianControl:
             group = self.packages[package].get("group", default_rpm_group)
             section = self.group2section(group)
             yield "+Section: %s" % section
-            yield "+Architecture: %s" % "all"
+            yield "+Architecture: %s" % self.architecture
             depends = self.packages[package].get("requires", "")
+            provides = self.packages[package].get("provides", "")
             replaces = self.packages[package].get("replaces", "")
             conflicts = self.packages[package].get("conflicts", "")
             pre_depends = self.packages[package].get("prereq", "")
             if depends:
                 deb_depends = [self.deb_requires(req) for req in depends]
                 yield "+Depends: %s" % ", ".join(deb_depends)
+            if provides:
+                deb_provides = [self.deb_provides(req) for req in provides]
+                yield "+Provides: %s" % ", ".join(deb_provides)
             if replaces:
                 deb_replaces = [self.deb_requires(req) for req in replaces]
                 yield "+Replaces: %s" % ", ".join(deb_replaces)
