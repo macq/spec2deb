@@ -174,6 +174,11 @@ class RpmSpecToDebianControl:
         return False
 
     def get(self, name, default=None):
+        if self.package and self.package != "%{name}":
+            values = self.packages[self.package].get(name, [])
+            if len(values) > 0:
+                return self.expand(values[0])
+
         if name in self.var:
             return self.var[name]
         return default
@@ -250,9 +255,9 @@ class RpmSpecToDebianControl:
     def append_setting(self, name, value):
         package_sections = ["requires", "buildrequires", "prereq",
                             "provides", "conflicts", "suggests"]
-        value = value.strip()
+        value = self.expand(value.strip())
         if name in package_sections:
-            requires = self.on_requires.findall(self.expand(value))
+            requires = self.on_requires.findall(value)
             for require in requires:
                 self.packages[self.package].setdefault(
                     name, []).append(require[0])
@@ -687,7 +692,9 @@ class RpmSpecToDebianControl:
             text = text.replace("%%", "\1")
             for found in self.on_embedded_name.finditer(text):
                 name, = found.groups()
-                if self.has(name):
+                if name == 'setup' or name == 'defattr':
+                    continue
+                elif self.has(name):
                     value = self.get(name)
                     text = re.sub("%"+name+"\\b", value, text)
                 else:
