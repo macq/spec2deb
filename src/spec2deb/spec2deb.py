@@ -1341,7 +1341,7 @@ class RpmSpecToDebianControl:
             for deb_section, section in sections:
                 scripts = self.packages[package].get(section, "")
                 if scripts:
-                    yield nextfile+"%s.%s" % (deb_package, deb_section)
+                    yield nextfile+"debian/%s.%s" % (deb_package, deb_section)
                     yield "+#! /bin/sh"
                     for line in mapped[deb_section].split("\n"):
                         if line.strip():
