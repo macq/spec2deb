@@ -1314,8 +1314,8 @@ class RpmSpecToDebianControl:
         fi
         """
         postinst = """
-        if   [ "configure" = "$1" && "." = ".$2" ]; then  shift ; set -- "1" "$@"
-        elif [ "configure" = "$1" && "." != ".$2" ]; then shift ; set -- "2" "$@"
+        if       [ "configure" = "$1" ] && [ "." = ".$2" ]; then  shift ; set -- "1" "$@"
+        elif [ "configure" = "$1" ] && [ "." != ".$2" ]; then shift ; set -- "2" "$@"
         fi
         """
         prerm = """
