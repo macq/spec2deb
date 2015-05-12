@@ -103,7 +103,7 @@ usr_lib_rpm_macros = """# copy-n-paste from /usr/lib/rpm/macros
 
 debian_special_macros = """
 %__make                 /usr/bin/make
-%buildroot              $(CURDIR)/debian/tmp
+%buildroot              ${CURDIR}/debian/tmp
 %host                   $(DEB_HOST_GNU_TYPE)
 %host_alias             $(DEB_HOST_GNU_TYPE)
 %build                  $(DEB_BUILD_GNU_TYPE)
@@ -1106,6 +1106,7 @@ class RpmSpecToDebianControl:
 
         yield nextfile+"debian/vars"
         yield "+RPM_BUILD_ROOT=$(pwd)/debian/tmp"
+        yield "+CURDIR=$(pwd)"
         for name in self.has_rpm_macros():
             if name.startswith("_"):
                 value = self.get(name)
