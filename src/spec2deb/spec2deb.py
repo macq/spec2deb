@@ -1220,7 +1220,7 @@ class RpmSpecToDebianControl:
         yield "+\tdh_link"
         yield "+\tdh_strip"
         yield "+\tdh_compress"
-        yield "+\tdh_fixperms"
+        # "+\tdh_fixperms"
         yield "+\tdh_makeshlibs -V"
         yield "+\tdh_installdeb"
         yield "+\tdh_shlibdeps"
