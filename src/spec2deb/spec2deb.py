@@ -785,6 +785,10 @@ class RpmSpecToDebianControl:
         withversion = re.match("(\S+)\s+(>=|>|<|<=|=|==)\s+(\S+)", requires)
         if withversion:
             package, relation, version = withversion.groups()
+            if relation == "<":
+                relation = "<<"
+            elif relation == ">":
+                relation = ">>"
             deb_package = self.deb_package_name(package)
             return "%s (%s %s)" % (deb_package, relation, version)
         else:
