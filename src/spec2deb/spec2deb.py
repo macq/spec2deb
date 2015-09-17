@@ -439,6 +439,12 @@ class RpmSpecToDebianControl:
     def endof_files(self):
         self.append_setting(self.section, self.sectiontext)
 
+    on_debug_package = re.compile(r"%(debug_package)(\s*)")
+
+    def set_debug_package(self):
+        _log.warning(
+            "Debug package detected but still not handled.")
+
     def parse(self, rpmspec):
         default = "%package "
         found_package = self.on_package.match(default)
@@ -461,6 +467,7 @@ class RpmSpecToDebianControl:
                 found_scripts = self.on_scripts.match(line)
                 found_files = self.on_files.match(line)
                 found_changelog = self.on_changelog.match(line)
+                found_debug_package = self.on_debug_package.match(line)
                 if found_comment:
                     pass
                 elif found_default_var1:
@@ -493,6 +500,8 @@ class RpmSpecToDebianControl:
                     self.start_files(found_files)
                 elif found_changelog:
                     self.start_changelog(found_changelog)
+                elif found_debug_package:
+                    self.set_debug_package()
                 elif not line.strip():
                     pass
                 else:
@@ -507,8 +516,9 @@ class RpmSpecToDebianControl:
                 found_scripts = self.on_scripts.match(line)
                 found_files = self.on_files.match(line)
                 found_changelog = self.on_changelog.match(line)
+                found_debug_package = self.on_debug_package.match(line)
                 if (found_package or found_description or found_rules or found_scripts
-                        or found_files or found_changelog):
+                        or found_files or found_changelog or found_debug_package):
                     self.endof_description()
                 if found_new_if:
                     self.new_if(found_new_if)
@@ -530,6 +540,8 @@ class RpmSpecToDebianControl:
                     self.start_files(found_files)
                 elif found_changelog:
                     self.start_changelog(found_changelog)
+                elif found_debug_package:
+                    self.set_debug_package()
                 else:
                     self.append_section(line)
             elif self.state() in ["rules"]:
@@ -542,8 +554,9 @@ class RpmSpecToDebianControl:
                 found_scripts = self.on_scripts.match(line)
                 found_files = self.on_files.match(line)
                 found_changelog = self.on_changelog.match(line)
+                found_debug_package = self.on_debug_package.match(line)
                 if (found_package or found_description or found_rules or found_scripts
-                        or found_files or found_changelog):
+                        or found_files or found_changelog or found_debug_package):
                     self.endof_files()
                 if found_new_if:
                     self.new_if(found_new_if)
@@ -565,6 +578,8 @@ class RpmSpecToDebianControl:
                     self.start_files(found_files)
                 elif found_changelog:
                     self.start_changelog(found_changelog)
+                elif found_debug_package:
+                    self.set_debug_package()
                 else:
                     self.append_section(line)
             elif self.state() in ["scripts"]:
@@ -577,8 +592,9 @@ class RpmSpecToDebianControl:
                 found_scripts = self.on_scripts.match(line)
                 found_files = self.on_files.match(line)
                 found_changelog = self.on_changelog.match(line)
+                found_debug_package = self.on_debug_package.match(line)
                 if (found_package or found_description or found_rules or found_scripts
-                        or found_files or found_changelog):
+                        or found_files or found_changelog or found_debug_package):
                     self.endof_scripts()
                 if found_new_if:
                     self.new_if(found_new_if)
@@ -600,6 +616,8 @@ class RpmSpecToDebianControl:
                     self.start_files(found_files)
                 elif found_changelog:
                     self.start_changelog(found_changelog)
+                elif found_debug_package:
+                    self.set_debug_package()
                 else:
                     self.append_section(line)
             elif self.state() in ["files"]:
@@ -612,8 +630,9 @@ class RpmSpecToDebianControl:
                 found_scripts = self.on_scripts.match(line)
                 found_files = self.on_files.match(line)
                 found_changelog = self.on_changelog.match(line)
+                found_debug_package = self.on_debug_package.match(line)
                 if (found_package or found_description or found_rules or found_scripts
-                        or found_files or found_changelog):
+                        or found_files or found_changelog or found_debug_package):
                     self.endof_files()
                 if found_new_if:
                     self.new_if(found_new_if)
@@ -635,6 +654,8 @@ class RpmSpecToDebianControl:
                     self.start_files(found_files)
                 elif found_changelog:
                     self.start_changelog(found_changelog)
+                elif found_debug_package:
+                    self.set_debug_package()
                 else:
                     self.append_section(line)
             elif self.state() in ["changelog"]:
@@ -644,8 +665,9 @@ class RpmSpecToDebianControl:
                 found_scripts = self.on_scripts.match(line)
                 found_files = self.on_files.match(line)
                 found_changelog = self.on_changelog.match(line)
+                found_debug_package = self.on_debug_package.match(line)
                 if (found_package or found_description or found_rules or found_scripts
-                        or found_files or found_changelog):
+                        or found_files or found_changelog or found_debug_package):
                     self.endof_description()
                 if found_package:
                     self.start_package(found_package)
@@ -659,6 +681,8 @@ class RpmSpecToDebianControl:
                     self.start_files(found_files)
                 elif found_changelog:
                     self.start_changelog(found_changelog)
+                elif found_debug_package:
+                    self.set_debug_package()
                 else:
                     self.append_section(line)
             else:
