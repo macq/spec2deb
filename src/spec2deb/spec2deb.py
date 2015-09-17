@@ -687,49 +687,52 @@ class RpmSpecToDebianControl:
 
     def expand(self, text):
         orig = text
-        for _ in xrange(100):
-            oldtext = text
-            text = text.replace("%%", "\1")
-            for found in self.on_embedded_name.finditer(text):
-                name, = found.groups()
-                if name == 'setup' or name == 'defattr':
-                    continue
-                elif self.has(name):
-                    value = self.get(name)
-                    text = re.sub("%"+name+"\\b", value, text)
-                else:
-                    _log.error("unable to expand %%%s in:\n %s\n %s",
-                               name, orig, text)
-            text = text.replace("%%", "\1")
-            for found in self.on_required_name.finditer(text):
-                name, = found.groups()
-                if self.has(name):
-                    value = self.get(name)
-                    text = re.sub("%{"+name+"}", value, text)
-                else:
-                    _log.error(
-                        "unable to expand %%{%s} in:\n %s\n %s", name, orig, text)
-            text = text.replace("%%", "\1")
-            for found in self.on_optional_name.finditer(text):
-                mark, name, replacement = found.groups()
+        lines = text.split('\n')
+        for line_index in range(len(lines)):
+            line = lines[line_index]
+            for _ in range(100):
+                oldline = line
+                line = line.replace("%%", "\1")
+                for found in self.on_embedded_name.finditer(line):
+                    name, = found.groups()
+                    if name == 'setup' or name == 'defattr' or name == 'dir' or name == 'attr' or name == 'config':
+                        continue
+                    elif self.has(name):
+                        value = self.get(name)
+                        line = re.sub("%"+name+"\\b", value, line)
+                    else:
+                        _log.error("unable to expand %%%s in: %s", name, line)
+                line = line.replace("%%", "\1")
+                for found in self.on_required_name.finditer(line):
+                    name, = found.groups()
+                    if self.has(name):
+                        value = self.get(name)
+                        line = re.sub("%{"+name+"}", value, line)
+                    else:
+                        _log.error(
+                            "unable to expand %%{%s} in : %s", name, line)
+                line = line.replace("%%", "\1")
+                for found in self.on_optional_name.finditer(line):
+                    mark, name, replacement = found.groups()
 
-                to_replace = "%{"
-                to_replace += "\?" if (mark == '?') else "!\?"
-                to_replace += name
-                if (replacement):
-                    to_replace += ":" + replacement
-                to_replace += "}"
-                value = ''
+                    to_replace = "%{"
+                    to_replace += "\?" if (mark == '?') else "!\?"
+                    to_replace += name
+                    if (replacement):
+                        to_replace += ":" + replacement
+                    to_replace += "}"
+                    value = ''
 
-                if (self.has(name) and mark == '?') or (not self.has(name) and mark == '!?'):
-                    value = replacement if replacement else self.get(name)
-                    text = re.sub(to_replace, value, text)
+                    if (self.has(name) and mark == '?') or (not self.has(name) and mark == '!?'):
+                        value = replacement if replacement else self.get(name)
+                        line = re.sub(to_replace, value, line)
 
-                text = re.sub(to_replace, value, text)
-
-            text = text.replace("\1", "%%")
-            if oldtext == text:
-                break
+                    line = re.sub(to_replace, value, line)
+                line = line.replace("\1", "%%")
+                if line == oldline:
+                    break
+            lines[line_index] = line
+        text = "\n".join(lines)
         if "$(" in text and orig not in ["%buildroot", "%__make"]:
             _log.warning(
                 "expand of '%s' left a make variable:\n %s", orig, text)
