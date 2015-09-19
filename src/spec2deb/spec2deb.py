@@ -140,8 +140,8 @@ class RpmSpecToDebianControl:
         self.section = ""
         self.sectiontext = ""
         self.states = []
-        self.var = {}
-        self.typed = {}
+        self.var = {"autoreqprov": "yes"}
+        self.typed = {"autoreqprov": "global"}
         self.rpm_macros = []
         self.urgency = urgency
         self.promote = promote
@@ -783,12 +783,13 @@ class RpmSpecToDebianControl:
             deb_package = self.deb_package_name(self.expand(deb_package))
             yield deb_package, package
 
-    def deb_package_name(self, deb_package):
+    def deb_package_name(self, package):
         """ debian.org/doc/debian-policy/ch-controlfields.html##s-f-Source
                 ... must consist only of lower case letters (a-z), digits (0-9),
                 plus (+) and minus (-) signs, and periods (.), must be at least
                 two characters long and must start with an alphanumeric. """
-        package = string.lower(deb_package).replace("_", "")
+        if not package.startswith("${"):
+            package = string.lower(package).replace("_","")
         if package in known_package_mapping:
             package = known_package_mapping[package]
         elif package.endswith("-devel"):
@@ -1026,7 +1027,10 @@ class RpmSpecToDebianControl:
             section = self.group2section(group)
             yield "+Section: %s" % section
             yield "+Architecture: %s" % self.architecture
-            depends = self.packages[package].get("requires", "")
+            depends = self.packages[package].get("requires", [])
+            if self.get("autoreqprov") == "yes":
+                depends.append("${shlibs:Depends}")
+            depends.append("${misc:Depends}")
             provides = self.packages[package].get("provides", "")
             replaces = self.packages[package].get("replaces", "")
             conflicts = self.packages[package].get("conflicts", "")
@@ -1252,9 +1256,11 @@ class RpmSpecToDebianControl:
         yield "+\tdh_strip"
         yield "+\tdh_compress"
         # "+\tdh_fixperms"
-        yield "+\tdh_makeshlibs -V"
+        if self.get("autoreqprov") == "yes":
+            yield "+\tdh_makeshlibs -V"
         yield "+\tdh_installdeb"
-        yield "+\tdh_shlibdeps"
+        if self.get("autoreqprov") == "yes":
+            yield "+\tdh_shlibdeps"
         yield "+\tdh_gencontrol"
         yield "+\tdh_md5sums"
         yield "+\tdh_builddeb"
