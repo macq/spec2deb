@@ -862,9 +862,6 @@ class RpmSpecToDebianControl:
     def deb_revision(self):
         if self.cache_revision is None:
             release = self.get("release", "0")
-            dot = release.find(".")
-            if dot > 0:
-                release = release[:dot]
             value = self.deb_version()+"-"+release
             self.cache_revision = self.expand(value)
         return self.cache_revision
