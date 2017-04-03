@@ -446,6 +446,8 @@ class RpmSpecToDebianControl:
         _log.warning(
             "Debug package detected but still not handled.")
 
+    on_ghost = re.compile(r"%(ghost)\s.*")
+
     def parse(self, rpmspec):
         default = "%package "
         found_package = self.on_package.match(default)
@@ -633,6 +635,7 @@ class RpmSpecToDebianControl:
                 found_rules = self.on_rules.match(line)
                 found_scripts = self.on_scripts.match(line)
                 found_files = self.on_files.match(line)
+                found_ghost = self.on_ghost.match(line)
                 found_changelog = self.on_changelog.match(line)
                 found_debug_package = self.on_debug_package.match(line)
                 if (found_package or found_description or found_rules or found_scripts
@@ -654,6 +657,9 @@ class RpmSpecToDebianControl:
                     self.start_rules(found_rules)
                 elif found_scripts:
                     self.start_scripts(found_scripts)
+                elif found_ghost:
+                    print("skipping ghost line in files section")
+                    continue
                 elif found_files:
                     self.start_files(found_files)
                 elif found_changelog:
