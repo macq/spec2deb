@@ -284,7 +284,7 @@ class RpmSpecToDebianControl:
 
     def append_section(self, text=None):
         self.sectiontext += text or ""
-    on_variable = re.compile(r"%(define|global)\s+(\S+)\s+(.*)")
+    on_variable = re.compile(r"\s*%(define|global)\s+(\S+)\s+(.*)")
 
     def save_variable(self, found_variable):
         typed, name, value = found_variable.groups()
@@ -548,6 +548,7 @@ class RpmSpecToDebianControl:
                 found_new_if = self.on_new_if.match(line)
                 found_else = self.on_else.match(line)
                 found_end_if = self.on_end_if.match(line)
+                found_variable = self.on_variable.match(line)
                 found_package = self.on_package.match(line)
                 found_description = self.on_description.match(line)
                 found_rules = self.on_rules.match(line)
@@ -566,6 +567,8 @@ class RpmSpecToDebianControl:
                     self.end_if()
                 elif self.skip_if():
                     continue
+                elif found_variable:
+                    self.save_variable(found_variable)
                 elif found_package:
                     self.start_package(found_package)
                 elif found_description:
