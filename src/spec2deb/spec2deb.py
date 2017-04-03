@@ -99,6 +99,7 @@ usr_lib_rpm_macros = """# copy-n-paste from /usr/lib/rpm/macros
 
 %_tmppath               %{_var}/tmp
 %_docdir                %{_datadir}/doc
+%make_install           make install DESTDIR=${RPM_BUILD_ROOT}
 """
 
 debian_special_macros = """
