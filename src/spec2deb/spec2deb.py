@@ -667,6 +667,7 @@ class RpmSpecToDebianControl:
                 elif found_debug_package:
                     self.set_debug_package()
                 else:
+                    line = line.replace("(noreplace)", "")
                     self.append_section(line)
             elif self.state() in ["changelog"]:
                 found_package = self.on_package.match(line)
