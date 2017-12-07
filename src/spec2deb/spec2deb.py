@@ -255,13 +255,19 @@ class RpmSpecToDebianControl:
 
     def append_setting(self, name, value):
         package_sections = ["requires", "buildrequires", "prereq",
-                            "provides", "conflicts", "suggests"]
+                            "provides", "conflicts", "suggests", "obsoletes"]
         value = self.expand(value.strip())
         if name in package_sections:
             requires = self.on_requires.findall(value)
             for require in requires:
-                self.packages[self.package].setdefault(
-                    name, []).append(require[0])
+                if name == "obsoletes":
+                    self.packages[self.package].setdefault(
+                        "conflicts", []).append(require[0])
+                    self.packages[self.package].setdefault(
+                        "replaces", []).append(require[0])
+                else:
+                    self.packages[self.package].setdefault(
+                        name, []).append(require[0])
         else:
             self.packages[self.package].setdefault(name, []).append(value)
         # also provide the setting for macro expansion:
