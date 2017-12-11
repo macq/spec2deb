@@ -843,11 +843,15 @@ class RpmSpecToDebianControl:
             "(\S+)\s+(=>|>=|>|<|=<|<=|=|==)\s+(\S+)", provides)
         if withversion:
             package, relation, version = withversion.groups()
+            if relation == "<":
+                relation = "<<"
+            elif relation == ">":
+                relation = ">>"
             deb_package = self.deb_package_name(package)
-            return deb_package  # remove version from provides
+            return "%s (%s %s)" % (deb_package, relation, version)
         else:
             deb_package = self.deb_package_name(provides.strip())
-            return deb_package
+            return "%s (= %s)" % (deb_package, self.deb_version())
 
     def deb_sourcefile(self):
         sourcefile = self.get("source", self.get("source0"))
