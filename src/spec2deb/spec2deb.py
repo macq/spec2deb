@@ -1256,6 +1256,7 @@ class RpmSpecToDebianControl:
         yield "+\tdh_prep"
         yield "+\tdh_installdirs"
         yield "+\t# Add here commands to install the package into debian/tmp"
+        yield "+\tmkdir -p debian/tmp"
         # +		  $(MAKE) install DESTDIR=$(CURDIR)/debian/tmp
         yield "+\tbash debian/install.sh"
 #		for line in self.deb_script("%install"):
