@@ -1709,8 +1709,8 @@ if __name__ == "__main__":
 
     for arg in args:
         work.parse(arg)
-        if arg.endswith(".spec"):
-            spec = arg[:-(len(".spec"))]
+        if ".spec" in arg:
+            spec = arg
     done = 0
     if opts.importance:
         work.set_package_importance(opts.importance)
