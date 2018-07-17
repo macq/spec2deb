@@ -1200,7 +1200,7 @@ class RpmSpecToDebianControl:
         yield "+#!/usr/bin/make -f"
         yield "+# -*- makefile -*-"
         yield "+# Uncomment this to turn on verbose mode."
-        yield "+export DH_VERBOSE=1"
+        yield "+#export DH_VERBOSE=1"
         yield "+"
         yield "+# These are used for cross-compiling and for saving the configure script"
         yield "+# from having to guess our platform (since we know it already)"
