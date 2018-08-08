@@ -55,6 +55,7 @@ package_architecture = "any"
 package_importance = "optional"
 _package_importances = ["required", "important",
                         "standard", "optional", "extra"]
+check = True
 
 source_format = "1.0"  # "2.0" # "3.0 (quilt)" #
 _source_formats = {
@@ -151,6 +152,7 @@ class RpmSpecToDebianControl:
         self.debhelper_compat = debhelper_compat
         self.source_format = source_format
         self.debtransform = debtransform
+        self.check = check
         self.scan_macros(usr_lib_rpm_macros, "default")
         self.scan_macros(debian_special_macros, "debian")
         self.cache_packages2 = []
@@ -1186,9 +1188,10 @@ class RpmSpecToDebianControl:
         yield "+. debian/vars"
         for line in self.deb_script("%build"):
             yield "+\t"+line
-        yield "+echo spec2deb inserted check section after build."
-        for line in self.deb_script("%check"):
-            yield "+\t"+line
+        if self.check:
+            yield "+echo spec2deb inserted check section after build."
+            for line in self.deb_script("%check"):
+                yield "+\t"+line
 
         yield nextfile+"debian/install.sh"
         yield "+#!/bin/bash"
@@ -1670,6 +1673,7 @@ _o.add_option("-p", metavar="path", dest="path",
               help="Specify a variable value in case spec parsing cannot determine it")
 _o.add_option("-d", metavar="sources", help="""create and populate a debian sources
 directory. Automatically sets --dsc and --diff, creates an orig.tar.gz and assumes --no-debtransform""")
+_o.add_option("--nocheck", action="count", help="skip unit-tests")
 
 if __name__ == "__main__":
     opts, args = _o.parse_args()
@@ -1712,6 +1716,8 @@ if __name__ == "__main__":
         if ".spec" in arg:
             spec = arg
     done = 0
+    if opts.nocheck:
+        work.check = False
     if opts.importance:
         work.set_package_importance(opts.importance)
     if opts.debtransform:
