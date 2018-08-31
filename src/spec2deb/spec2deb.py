@@ -1095,33 +1095,87 @@ class RpmSpecToDebianControl:
             filesection = self.packages[package].get("%files", [""])
             if not isinstance(filesection, list):
                 filesection = [filesection]
+            # hack: we put commands with file permission modifications in the post section...
+            postsection = self.packages[package].get("%post")
+            if not postsection:
+                self.packages[package]["%post"] = []
+                postsection = self.packages[package].get("%post")
+            # for each package we start again with the default file permissions
+            package_file_permissions = '-'
+            package_file_user = 'root'
+            package_file_group = 'root'
             for files in filesection:
                 for path in files.split("\n"):
-                    if path.startswith("%config"):
-                        path = path[len("%config"):].strip()
-                        if path:
-                            files_list.append(path)
-                            if "/etc/" not in "/"+path:
+                    # clean up path. dpkg -L will give clean paths, so this has to match exactly
+                    path = re.sub('"', '', path.strip())
+                    path = re.sub('/+', '/', path)
+                    file_with_attr = {
+                        "permissions": package_file_permissions,
+                        "user": package_file_user,
+                        "group": package_file_group,
+                        "path": path,
+                        "dir": False,
+                        "doc": False}
+                    while file_with_attr["path"].startswith("%"):
+                        if file_with_attr["path"].startswith("%config"):
+                            file_with_attr["path"] = file_with_attr["path"][len(
+                                "%config"):].strip()
+                            if not file_with_attr["path"].startswith("/etc/"):
                                 _log.warning(
-                                    "debhelpers will treat files in /etc/ as configs but not your '%s'", path)
-                    elif path.startswith("%doc"):
-                        path = path[len("%doc"):].strip()
-                        docs += [path]
-                        continue
-                    elif path.startswith("%dir"):
-                        path = path[len("%dir"):].strip()
-                        if path:
-                            dirs_list.append(path)
-                        continue
-                    elif path.startswith("%defattr"):
-                        continue
-                    else:
-                        path = path.strip()
-                        if path.startswith("/"):
-                            path = path[1:]
-                        if path:
-                            files_list.append(path)
-                        continue
+                                    "debhelpers will treat files in /etc/ as configs but not your '%s'", file_with_attr["path"])
+                        elif file_with_attr["path"].startswith("%doc"):
+                            file_with_attr["doc"] = True
+                            file_with_attr["path"] = file_with_attr["path"][len(
+                                "%doc"):].strip()
+                        elif file_with_attr["path"].startswith("%dir"):
+                            file_with_attr["dir"] = True
+                            file_with_attr["path"] = file_with_attr["path"][len(
+                                "%dir"):].strip()
+                        elif file_with_attr["path"].startswith("%attr"):
+                            parts = re.split('\(|,|\)', file_with_attr["path"])
+                            file_with_attr["permissions"] = parts[1].strip()
+                            file_with_attr["user"] = parts[2].strip()
+                            file_with_attr["group"] = parts[3].strip()
+                            file_with_attr["path"] = parts[4].strip()
+                        elif file_with_attr["path"].startswith("%defattr"):
+                            parts = re.split('\(|,|\)', file_with_attr["path"])
+                            package_file_permissions = parts[1].strip()
+                            package_file_user = parts[2].strip()
+                            package_file_group = parts[3].strip()
+                            file_with_attr["path"] = parts[4].strip()
+                        else:
+                            parts = file_with_attr["path"].split()
+                            _log.warning(
+                                "Warning: ingoring file prefix: " + parts[0])
+                            file_with_attr["path"] = file_with_attr["path"][len(
+                                parts[0]):].strip()
+                    if file_with_attr["doc"]:
+                        docs += [file_with_attr["path"]]
+                    # The next lines might seem contradictory. Some word of explanation:
+                    # - The %dir directive in a spec file = package the directory and NOT the files below
+                    # Hence:
+                    # - dir: NON-recursive changing of permissions and ownership
+                    # - !dir: (which might be a file or directory; it just has not been marked with %dir in spec file): recursive!
+                    elif file_with_attr["dir"]:
+                        dirs_list.append(file_with_attr["path"])
+                        if file_with_attr["permissions"] != '-':
+                            postsection.append(
+                                "chmod " + file_with_attr["permissions"] + " " + file_with_attr["path"] + " || true")
+                        postsection.append(
+                            "chown " + file_with_attr["user"] + ":" + file_with_attr["group"] + " " + file_with_attr["path"] + " || true")
+                    elif len(file_with_attr["path"]):
+                        files_list.append(file_with_attr["path"])
+                        final_package_name = self.deb_package_name(
+                            self.expand(package))
+                        path_pattern = re.sub(
+                            '\*', '.*', file_with_attr["path"])  # replace * with .*
+                        # remove final /; otherwise directory permissions would not be changed
+                        path_pattern = path_pattern.rstrip("/")
+                        if file_with_attr["permissions"] != '-':
+                            postsection.append("dpkg -L " + final_package_name + " | grep '^" +
+                                               path_pattern + r"' | xargs -d '\n' -i chmod " + file_with_attr["permissions"] + " {} || true")
+                        postsection.append("dpkg -L " + final_package_name + " | grep '^" + path_pattern +
+                                           r"' | xargs -d '\n' -i chown " + file_with_attr["user"] + ":" + file_with_attr["group"] + " {} || true")
             if dirs_list:
                 yield nextfile+dirs_name
                 for path in dirs_list:
