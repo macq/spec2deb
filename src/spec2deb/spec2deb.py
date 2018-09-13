@@ -253,7 +253,8 @@ class RpmSpecToDebianControl:
             else:
                 self.package = "%{name}"
         self.packages.setdefault(self.package, {})
-    on_requires = re.compile(r"([\w.+_-]+(\s+(>=|>|<|<=|=|==)\s+[\w.~+_-]+)?)")
+    on_requires = re.compile(
+        r"([\w.+_-]+(\s+(=>|>=|>|<|=<|<=|=|==)\s+[\w.~+_-]+)?)")
 
     def append_setting(self, name, value):
         package_sections = ["requires", "buildrequires", "prereq",
@@ -826,13 +827,20 @@ class RpmSpecToDebianControl:
 
     def deb_requires(self, requires):
         requires = self.expand(requires)
-        withversion = re.match("(\S+)\s+(>=|>|<|<=|=|==)\s+(\S+)", requires)
+        withversion = re.match(
+            "(\S+)\s+(=>|>=|>|<|=<|<=|=|==)\s+(\S+)", requires)
         if withversion:
             package, relation, version = withversion.groups()
             if relation == "<":
                 relation = "<<"
             elif relation == ">":
                 relation = ">>"
+            elif relation == "=>":
+                relation = ">="
+            elif relation == "=<":
+                relation = "<="
+            elif relation == "==":
+                relation = "="
             deb_package = self.deb_package_name(package)
             return "%s (%s %s)" % (deb_package, relation, version)
         else:
@@ -849,6 +857,12 @@ class RpmSpecToDebianControl:
                 relation = "<<"
             elif relation == ">":
                 relation = ">>"
+            elif relation == "=>":
+                relation = ">="
+            elif relation == "=<":
+                relation = "<="
+            elif relation == "==":
+                relation = "="
             deb_package = self.deb_package_name(package)
             return "%s (%s %s)" % (deb_package, relation, version)
         else:
