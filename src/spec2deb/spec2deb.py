@@ -1251,7 +1251,7 @@ class RpmSpecToDebianControl:
         yield "+#!/bin/bash"
         yield "+. debian/vars"
         for line in self.deb_script("%install"):
-            yield "+\t"+line
+            yield "+"+line
 
         yield nextfile+"debian/rules"
         yield "+#!/usr/bin/make -f"
