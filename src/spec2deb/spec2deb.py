@@ -56,6 +56,7 @@ package_importance = "optional"
 _package_importances = ["required", "important",
                         "standard", "optional", "extra"]
 check = True
+strip = True
 
 source_format = "1.0"  # "2.0" # "3.0 (quilt)" #
 _source_formats = {
@@ -153,6 +154,7 @@ class RpmSpecToDebianControl:
         self.source_format = source_format
         self.debtransform = debtransform
         self.check = check
+        self.strip = strip
         self.scan_macros(usr_lib_rpm_macros, "default")
         self.scan_macros(debian_special_macros, "debian")
         self.cache_packages2 = []
@@ -1350,7 +1352,8 @@ class RpmSpecToDebianControl:
         yield "+\tdh_installexamples"
         yield "+\tdh_installman"
         yield "+\tdh_link"
-        yield "+\tdh_strip"
+        if self.strip:
+            yield "+\tdh_strip"
         yield "+\tdh_compress"
         # "+\tdh_fixperms"
         if self.get("autoreqprov") == "yes":
@@ -1742,6 +1745,8 @@ _o.add_option("-p", metavar="path", dest="path",
 _o.add_option("-d", metavar="sources", help="""create and populate a debian sources
 directory. Automatically sets --dsc and --diff, creates an orig.tar.gz and assumes --no-debtransform""")
 _o.add_option("--nocheck", action="count", help="skip unit-tests")
+_o.add_option("--nostrip", action="count",
+              help="don't strip the files before packaging")
 
 if __name__ == "__main__":
     opts, args = _o.parse_args()
@@ -1786,6 +1791,8 @@ if __name__ == "__main__":
     done = 0
     if opts.nocheck:
         work.check = False
+    if opts.nostrip:
+        work.strip = False
     if opts.importance:
         work.set_package_importance(opts.importance)
     if opts.debtransform:
