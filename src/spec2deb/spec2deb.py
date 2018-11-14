@@ -1058,6 +1058,10 @@ class RpmSpecToDebianControl:
         yield "+Homepage: %s" % self.get("url", "")
         yield "+"
         for deb_package, package in sorted(self.deb_packages2()):
+            if package == "%{name}-debuginfo":
+                _log.info(
+                    "NOT building debuginfo package on deb: dbgsym packages should be created automatically")
+                continue
             if not self.packages[package].get("%files"):
                 _log.warning(
                     "Package %s doesn't have a %%files section, won't build", deb_package)
