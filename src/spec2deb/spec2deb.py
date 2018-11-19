@@ -1254,12 +1254,16 @@ class RpmSpecToDebianControl:
         yield nextfile+"debian/prep.sh"
         yield "+#!/bin/bash"
         yield "+. debian/vars"
+        yield "+set -e"
+        yield "+set -x"
         for line in self.deb_script("%prep"):
             yield "+\t"+line
 
         yield nextfile+"debian/build.sh"
         yield "+#!/bin/bash"
         yield "+. debian/vars"
+        yield "+set -e"
+        yield "+set -x"
         for line in self.deb_script("%build"):
             yield "+\t"+line
         if self.check:
@@ -1270,6 +1274,8 @@ class RpmSpecToDebianControl:
         yield nextfile+"debian/install.sh"
         yield "+#!/bin/bash"
         yield "+. debian/vars"
+        yield "+set -e"
+        yield "+set -x"
         for line in self.deb_script("%install"):
             yield "+"+line
 
