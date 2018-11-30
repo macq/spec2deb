@@ -256,7 +256,7 @@ class RpmSpecToDebianControl:
                 self.package = "%{name}"
         self.packages.setdefault(self.package, {})
     on_requires = re.compile(
-        r"([\w.+_-]+(\s+(=>|>=|>|<|=<|<=|=|==)\s+[\w.~+_-]+)?)")
+        r"([\w.+_-]+(\s+(=>|>=|>|<|=<|<=|=|==)\s+(\w+:)?[\w.~+_-]+)?)")
 
     def append_setting(self, name, value):
         package_sections = ["requires", "buildrequires", "prereq",
@@ -898,6 +898,10 @@ class RpmSpecToDebianControl:
             self.cache_version = self.expand(value)
         return self.cache_version
 
+    def deb_revision_with_epoch(self):
+        epoch = self.get("epoch", None)
+        return self.expand(epoch) + ":" + self.deb_revision() if epoch else self.deb_revision()
+
     def deb_revision(self):
         if self.cache_revision is None:
             release = self.get("release", "0")
@@ -914,7 +918,7 @@ class RpmSpecToDebianControl:
         binaries = list(self.deb_packages())
         yield "+Binary: %s" % ", ".join(binaries)
         yield "+Architecture: %s" % self.architecture
-        yield "+Version: %s" % self.deb_revision()
+        yield "+Version: %s" % self.deb_revision_with_epoch()
         yield "+Maintainer: %s" % self.get("packager", default_rpm_packager)
         yield "+Standards-Version: %s" % self.standards_version
         yield "+Homepage: %s" % self.get("url", "")
@@ -1222,7 +1226,7 @@ class RpmSpecToDebianControl:
 
     def debian_changelog(self, nextfile=_nextfile):
         name = self.expand(self.get("name"))
-        version = self.expand(self.deb_revision())
+        version = self.expand(self.deb_revision_with_epoch())
         packager = self.expand(self.get("packager", default_rpm_packager))
         promote = self.promote
         urgency = self.urgency
