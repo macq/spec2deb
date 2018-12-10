@@ -10,6 +10,10 @@ Note that the script has some builting "magic" to transform the rpm spec
 it might be failing in your case. And yes ... we take patches.
 """
 
+try:
+    import lzma
+except ImportError:
+    from backports import lzma
 from optparse import OptionParser
 import re
 import string
@@ -1681,6 +1685,13 @@ class RpmSpecToDebianControl:
             _log.info("copy %s to %s", sourcefile, filename)
             import shutil
             shutil.copyfile(sourcefile, filepath)
+            self.source_orig_file = filename
+            return "written '%s'" % filepath
+        elif sourcefile.endswith(".tar.xz"):
+            _log.info("recompress %s to %s", sourcefile, filename)
+            gz = gzip.GzipFile(filepath, "w")
+            gz.write(lzma.open(sourcefile).read())
+            gz.close()
             self.source_orig_file = filename
             return "written '%s'" % filepath
         elif sourcefile.endswith(".tar.bz2"):
