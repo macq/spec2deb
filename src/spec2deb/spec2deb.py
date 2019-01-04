@@ -1353,7 +1353,7 @@ class RpmSpecToDebianControl:
 #		for line in self.deb_script("%install"):
 #			yield "+\t"+line
         yield "+\t# Move all files in their corresponding package"
-        yield "+\tdh_install --list-missing --sourcedir=debian/tmp"
+        yield "+\tdh_install --list-missing --fail-missing --sourcedir=debian/tmp"
         yield "+\t# empty dependency_libs in .la files"
         yield "+\tfind debian/ -name '*.la' -exec sed -i \"/dependency_libs/ s/'.*'/''/\" {} \;"
         yield "+"
