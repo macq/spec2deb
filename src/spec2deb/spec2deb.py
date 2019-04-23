@@ -26,6 +26,8 @@ import commands
 import glob
 import sys
 import collections
+import time
+from zipfile import ZipFile
 
 _log = logging.getLogger(__name__)
 urgency = "low"
@@ -1702,6 +1704,35 @@ class RpmSpecToDebianControl:
             gz.write(bz.read())
             gz.close()
             bz.close()
+            self.source_orig_file = filename
+            return "written '%s'" % filepath
+        elif sourcefile.endswith(".zip"):
+            _log.info("recompress %s to %s", sourcefile, filename)
+            # inspired by https://bitbucket.org/ruamel/zip2tar which is much more elaborate...
+            with ZipFile(sourcefile) as zipf:
+                with tarfile.open(filepath, "w:gz") as tarf:
+                    for zip_info in zipf.infolist():
+                        tar_info = tarfile.TarInfo(name=zip_info.filename)
+                        tar_info.size = zip_info.file_size
+                        # time.mktime takes 9 arguments; zip_info.date_time is only a 6-tuple: so we add 3 values.
+                        tar_info.mtime = time.mktime(
+                            zip_info.date_time + (-1, -1, -1))
+                        # extract the file permissions from the zip_info.external_attr. Inspiration found here:
+                        # https://stackoverflow.com/questions/434641/how-do-i-set-permissions-attributes-on-a-file-in-a-zip-file-using-pythons-zip
+                        # the easy solution would have been to set permissions 755 for all files and directories...
+                        # 0x10 is the MS-DOS directory flag; used to detect directories.
+                        # in python 3.6 we could use zip_info.is_dir()
+                        if zip_info.external_attr & 0x10 or \
+                                zip_info.external_attr >> 16 & 0o755:  # seems like write permissions had been set
+                            # directory or executable
+                            tar_info.mode = 0o755
+                        else:
+                            # default: read-only
+                            tar_info.mode = 0o644
+                        tarf.addfile(
+                            tarinfo=tar_info,
+                            fileobj=zipf.open(zip_info.filename)
+                        )
             self.source_orig_file = filename
             return "written '%s'" % filepath
         else:
