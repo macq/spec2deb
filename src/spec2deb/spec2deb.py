@@ -1340,7 +1340,7 @@ class RpmSpecToDebianControl:
         yield "+\tdh_testdir"
         yield "+\tdh_testroot"
         yield "+\trm -f configure-stamp build-stamp"
-        yield "+\t[ ! -f Makefile ] || $(MAKE) distclean"
+        yield "+\tdh_auto_clean"
         yield "+\tdh_clean"
         yield "+"
         yield "+install: build"
