@@ -10,26 +10,29 @@ Note that the script has some builting "magic" to transform the rpm spec
 it might be failing in your case. And yes ... we take patches.
 """
 
+import bz2  # @UnresolvedImport
+import collections
+from functools import partial
+import glob
+import gzip
+import hashlib
+import io
+import logging
 try:
     import lzma
 except ImportError:
     from backports import lzma
 from optparse import OptionParser
-import re
-import string
 import os.path
-import gzip
+import re
+import shutil
+import subprocess
+import sys
+import string
 import tarfile
 import tempfile
-import logging
-import subprocess
-import glob
-import sys
-import collections
 import time
 from zipfile import ZipFile
-import hashlib
-from functools import partial
 
 _log = logging.getLogger(__name__)
 urgency = "low"
@@ -1689,7 +1692,6 @@ class RpmSpecToDebianControl:
         filepath = os.path.join(into or "", filename)
         if sourcefile.endswith(".tar.gz") or sourcefile.endswith(".tgz"):
             _log.info("copy %s to %s", sourcefile, filename)
-            import shutil
             shutil.copyfile(sourcefile, filepath)
             self.source_orig_file = filename
             return "written '%s'" % filepath
@@ -1702,7 +1704,6 @@ class RpmSpecToDebianControl:
             return "written '%s'" % filepath
         elif sourcefile.endswith(".tar.bz2"):
             _log.info("recompress %s to %s", sourcefile, filename)
-            import bz2  # @UnresolvedImport
             gz = gzip.GzipFile(filepath, "w")
             bz = bz2.BZ2File(sourcefile, "r")
             gz.write(bz.read())
