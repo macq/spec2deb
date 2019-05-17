@@ -1802,7 +1802,7 @@ _o.add_option("-f", "--diff", metavar="FILE", help="""create the debian.diff.gz 
 _o.add_option("--define", metavar="VARIABLE=VALUE", dest="defines",
               help="Specify a variable value in case spec parsing cannot determine it", action="append", default=[])
 _o.add_option("-p", metavar="path", dest="path",
-              help="Specify a variable value in case spec parsing cannot determine it")
+              help="Specify a path where to look for sources")
 _o.add_option("-d", metavar="sources", help="""create and populate a debian sources
 directory. Automatically sets --dsc and --diff, creates an orig.tar.gz and assumes --no-debtransform""")
 _o.add_option("--nocheck", action="count", help="skip unit-tests")
