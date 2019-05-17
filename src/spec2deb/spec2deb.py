@@ -1911,6 +1911,7 @@ def main(args_in):
         for line in work.debian_diff():
             print(line)
     if opts.d:
+        opts.d += "/"
         if not opts.dsc:
             opts.dsc = spec+".dsc"
         if not opts.diff:
