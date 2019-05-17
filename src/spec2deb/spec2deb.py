@@ -229,22 +229,18 @@ class RpmSpecToDebianControl:
         return self.states[0]
 
     def set_source_format(self, value):
-        if not value:
-            pass
-        elif value in _source_formats:
+        if value in _source_formats:
             self.source_format = _source_formats[value]
             _log.info("using source format '%s'" % self.source_format)
-        else:
+        elif value:
             _log.fatal("unknown source format: '%s'" % value)
 
     def set_package_importance(self, value):
-        if not value:
-            pass
-        elif value in _package_importances:
+        if value in _package_importances:
             self.package_importance = value
             _log.info("using package importance '%s'" %
                       self.package_importance)
-        else:
+        elif value:
             _log.fatal("unknown package_importance: '%s'" % value)
 
     def new_state(self, state):
@@ -353,9 +349,7 @@ class RpmSpecToDebianControl:
             _log.error("unmatched %else with no preceding %if")
 
     def end_if(self):
-        if self.states[-1] == "skip-if":
-            self.states = self.states[:-1]
-        elif self.states[-1] == "keep-if":
+        if self.states[-1] in ["skip-if", "keep-if"]:
             self.states = self.states[:-1]
         else:
             _log.error("unmatched %endif with no preceding %if")
@@ -495,6 +489,7 @@ class RpmSpecToDebianControl:
                 found_changelog = self.on_changelog.match(line)
                 found_debug_package = self.on_debug_package.match(line)
                 if found_comment:
+                    # ignore comments
                     pass
                 elif found_default_var1:
                     self.default_var1(found_default_var1)
@@ -528,9 +523,8 @@ class RpmSpecToDebianControl:
                     self.start_changelog(found_changelog)
                 elif found_debug_package:
                     self.set_debug_package()
-                elif not line.strip():
-                    pass
-                else:
+                elif line.strip():
+                    # line is not empty...
                     _log.error("%s unmatched line:\n %s", self.state(), line)
             elif self.state() in ["description"]:
                 found_new_if = self.on_new_if.match(line)
@@ -724,8 +718,8 @@ class RpmSpecToDebianControl:
         # for line
         if self.skip_if():
             self.error("end of while in skip-if section")
-            pass
         if self.state() in ["package"]:
+            # nothing to do...
             pass
         elif self.state() in ["description"]:
             self.endof_description()
@@ -812,8 +806,8 @@ class RpmSpecToDebianControl:
     def _deb_packages2(self):
         for package in sorted(self.packages):
             deb_package = package
-#			if deb_package == "%{name}" and len(self.packages) > 1:
-#				deb_package = "%{name}-bin"
+            # if deb_package == "%{name}" and len(self.packages) > 1:
+            # deb_package = "%{name}-bin"
             deb_package = self.deb_package_name(self.expand(deb_package))
             yield deb_package, package
 
@@ -1113,7 +1107,6 @@ class RpmSpecToDebianControl:
                     req) for req in pre_depends]
                 yield "+Pre-Depends: %s" % ", ".join(deb_pre_depends)
             text = self.packages[package].get("%description", "")
-            # yield "+Description: %s" % self.deb_description_from(text)
             for line in self.deb_description_lines(text):
                 yield "+"+self.expand(line)
             yield "+"
@@ -1374,7 +1367,7 @@ class RpmSpecToDebianControl:
         yield "+binary-arch: build install"
         yield "+\tdh_testdir"
         yield "+\tdh_testroot"
-#		yield "+\tdh_installchangelogs ChangeLog"
+        # "+\tdh_installchangelogs ChangeLog"
         yield "+\tdh_installdocs"
         yield "+\tdh_installexamples"
         yield "+\tdh_installman"
@@ -1444,10 +1437,9 @@ class RpmSpecToDebianControl:
                 if found:
                     here = found.group(0)
                     _log.warning("unexpanded '%s' found:\n %s", here, line)
-                if line.strip() == "rm -rf $(CURDIR)/debian/tmp":
-                    if section != "%clean":
-                        _log.warning(
-                            "found rm -rf %%buildroot in section %s (should only be in %%clean)", section)
+                if line.strip() == "rm -rf $(CURDIR)/debian/tmp" and section != "%clean":
+                    _log.warning(
+                        "found rm -rf %%buildroot in section %s (should only be in %%clean)", section)
                 # ifelse handling
                 found_ifelse_if = on_ifelse_if.match(line)
                 found_ifelse_then = on_ifelse_then.match(line)
@@ -1466,9 +1458,8 @@ class RpmSpecToDebianControl:
                         _log.error("'else' outside ';then'-block")
                 elif found_ifelse_ends:
                     ifelse += -1
-                elif ifelse:
-                    if not line.strip().endswith("\\"):
-                        line += "; \\"
+                elif ifelse and not line.strip().endswith("\\"):
+                    line += "; \\"
                 if line.strip():
                     yield line
 
@@ -1561,7 +1552,7 @@ class RpmSpecToDebianControl:
         yield nextfile+"debian/source/format"
         yield "+"+self.source_format
 
-    def p(self, subdir, patch):
+    def get_patch_path(self, subdir, patch):
         if "3." in self.source_format or self.debtransform:
             return patch
         else:
@@ -1581,8 +1572,8 @@ class RpmSpecToDebianControl:
                     line = " ".join(line)
                 if line.startswith(_nextfile):
                     if patch:
-                        yield "--- %s" % self.p(old, patch)
-                        yield "+++ %s" % self.p(src, patch)
+                        yield "--- %s" % self.get_patch_path(old, patch)
+                        yield "+++ %s" % self.get_patch_path(src, patch)
                         yield "@@ -0,0 +1,%i @@" % (len(lines))
                         for plus in lines:
                             yield plus
@@ -1591,16 +1582,15 @@ class RpmSpecToDebianControl:
                 else:
                     lines += [line]
             # end of deb
-            if True:
-                if lines:
-                    if patch:
-                        yield "--- %s" % self.p(old, patch)
-                        yield "+++ %s" % self.p(src, patch)
-                        yield "@@ -0,0 +1,%i @@" % (len(lines))
-                        for plus in lines:
-                            yield plus
-                    else:
-                        _log.error("have lines but no patch name: %s", deb)
+            if lines:
+                if patch:
+                    yield "--- %s" % self.get_patch_path(old, patch)
+                    yield "+++ %s" % self.get_patch_path(src, patch)
+                    yield "@@ -0,0 +1,%i @@" % (len(lines))
+                    for plus in lines:
+                        yield plus
+                else:
+                    _log.error("have lines but no patch name: %s", deb)
 
     def write_debian_dsc(self, filename, into=None):
         filepath = os.path.join(into or "", filename)
@@ -1670,13 +1660,11 @@ class RpmSpecToDebianControl:
                     f.write(line[1:] + "\n")
                     continue
                 _log.warning("unknown %s line:\n %s", state, line)
-            if True:
-                if True:
-                    if name:
-                        f.flush()
-                        tar.add(f.name, name)
-                        f.close()
-                        name = ""
+            if name:
+                f.flush()
+                tar.add(f.name, name)
+                f.close()
+                name = ""
             tar.close()
             self.debian_file = filename
             return "written '%s'" % filepath
@@ -1922,7 +1910,6 @@ def main(args_in):
         done += opts.debian_diff
         for line in work.debian_diff():
             print(line)
-    auto = False
     if opts.d:
         if not opts.dsc:
             opts.dsc = spec+".dsc"
@@ -1940,7 +1927,6 @@ def main(args_in):
         if not os.path.isdir(opts.d):
             os.mkdir(opts.d)
     elif not done and not opts.diff and not opts.dsc:
-        auto = True
         if work.debtransform:
             work.debian_file = "debian.tar.gz"
         elif "3." in work.source_format:
