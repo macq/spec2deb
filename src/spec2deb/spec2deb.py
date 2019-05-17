@@ -1809,8 +1809,9 @@ _o.add_option("--nocheck", action="count", help="skip unit-tests")
 _o.add_option("--nostrip", action="count",
               help="don't strip the files before packaging")
 
-if __name__ == "__main__":
-    opts, args = _o.parse_args()
+
+def main(args_in):
+    opts, args = _o.parse_args(args_in)
     logging.basicConfig(format="%(levelname)s: %(message)s",
                         level=max(0, logging.INFO - 5 * (opts.verbose - opts.quiet)))
     DONE = logging.INFO + 5
@@ -1968,3 +1969,7 @@ if __name__ == "__main__":
         _log.log(HINT, cmd)
         output = subprocess.check_output(cmd, shell=True)
         _log.info("%s", output)
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])
