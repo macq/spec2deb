@@ -22,12 +22,14 @@ import gzip
 import tarfile
 import tempfile
 import logging
-import commands
+import subprocess
 import glob
 import sys
 import collections
 import time
 from zipfile import ZipFile
+import hashlib
+from functools import partial
 
 _log = logging.getLogger(__name__)
 urgency = "low"
@@ -169,7 +171,7 @@ class RpmSpecToDebianControl:
         self.architecture = package_architecture
 
     def has_names(self):
-        return self.var.keys()
+        return list(self.var.keys())
 
     def has_rpm_macros(self):
         return self.rpm_macros
@@ -284,7 +286,7 @@ class RpmSpecToDebianControl:
         # also provide the setting for macro expansion:
         if not self.package or self.package == "%{name}":
             if not name.startswith("%"):
-                name1 = string.lower(name)
+                name1 = name.lower()
                 if name1 in ["source", "patch"]:
                     name1 += "0"
                 if name1 not in package_sections:
@@ -320,7 +322,8 @@ class RpmSpecToDebianControl:
 
     def save_setting(self, found_setting):
         name, value = found_setting.groups()
-        self.append_setting(string.lower(name), value)
+        self.append_setting(name.lower(), value)
+
     on_new_if = re.compile(r"%if\b(.*)")
     on_else = re.compile(r"%else\b(.*)")
     on_end_if = re.compile(r"%endif\b(.*)")
@@ -332,7 +335,7 @@ class RpmSpecToDebianControl:
         try:
             condition_result = eval(condition)
         except SyntaxError:
-            print 'SyntaxError exception during evaluation of ' + condition
+            print('SyntaxError exception during evaluation of ' + condition)
         if condition_result:
             self.states.append("keep-if")
         else:
@@ -817,7 +820,7 @@ class RpmSpecToDebianControl:
                 plus (+) and minus (-) signs, and periods (.), must be at least
                 two characters long and must start with an alphanumeric. """
         if not package.startswith("${"):
-            package = string.lower(package).replace("_","")
+            package = package.lower().replace("_", "")
         if package in known_package_mapping:
             package = known_package_mapping[package]
         elif package.endswith("-devel"):
@@ -965,10 +968,11 @@ class RpmSpecToDebianControl:
     def md5sum(self, filename):
         if not os.path.exists(filename):
             return "0" * 32
-        import hashlib
-        md5 = hashlib.md5()  # @UndefinedVariable
-        md5.update(open(filename).read())
-        return md5.hexdigest()
+        with open(filename, mode='rb') as f:
+            d = hashlib.md5()
+            for buf in iter(partial(f.read, 128), b''):
+                d.update(buf)
+        return d.hexdigest()
 
     def group2section(self, group):
         # there are 3 areas ("main", "contrib", "non-free") with multiple
@@ -1032,7 +1036,7 @@ class RpmSpecToDebianControl:
         }
         if isinstance(group, list) and len(group) >= 1:
             group = group[0]
-        for section, group_prefixes in debian.items():
+        for section, group_prefixes in list(debian.items()):
             for group_prefix in group_prefixes:
                 if group.startswith(group_prefix):
                     return section
@@ -1399,7 +1403,7 @@ class RpmSpecToDebianControl:
             for line in lines.split("\n"):
                 if line.startswith("%setup"):
                     continue
-                for _ in xrange(10):
+                for _ in range(10):
                     old = line
                     line = re.sub("[%][{][?]_with[^{}]*[}]", "", line)
                     line = re.sub("[%][{][!][?]_with[^{}]*[}]", "", line)
@@ -1531,13 +1535,13 @@ class RpmSpecToDebianControl:
                     textfile.close()
                     # patches.append(source) -> do not do this anymore
                     self.set("SOURCE%i" % n, "$(CURDIR)/"+sourcepath, "source")
-                except Exception, e:
+                except Exception as e:
                     _log.error(
                         "append source%i '%s' failed:\n %s", n, source, e)
         patch = self.get("patch")
         if patch:
             patches.append(patch)
-        for n in xrange(100):
+        for n in range(100):
             patch = self.get("patch%i" % n)
             if patch:
                 patches.append(patch)
@@ -1681,7 +1685,7 @@ class RpmSpecToDebianControl:
         sourcefile = self.expand(self.deb_sourcefile())
         if not os.path.isfile(sourcefile):
             sourcefile = os.path.join(path or "", sourcefile)
-            print "----------------- sourcefile " + sourcefile
+            print("----------------- sourcefile " + sourcefile)
         filepath = os.path.join(into or "", filename)
         if sourcefile.endswith(".tar.gz") or sourcefile.endswith(".tgz"):
             _log.info("copy %s to %s", sourcefile, filename)
@@ -1863,59 +1867,59 @@ if __name__ == "__main__":
         work.promote = opts.promote
     if opts.vars:
         done += opts.vars
-        print "# have %s variables" % len(work.var)
+        print("# have %s variables" % len(work.var))
         for name in sorted(work.has_names()):
             typed = work.typed[name]
-            print "%%%s %s %s" % (typed, name, work.get(name))
+            print("%%%s %s %s" % (typed, name, work.get(name)))
     else:
         _log.log(HINT, "have %s variables (use -1 to show them)" %
                  len(work.var))
     if opts.packages:
         done += opts.packages
-        print "# have %s packages" % len(work.packages)
+        print("# have %s packages" % len(work.packages))
         for package in sorted(work.packages):
-            print " %package -n", package
+            print(" %package -n", package)
             for name in sorted(work.packages[package]):
-                print "  %s:%s" % (name, work.packages[package][name])
+                print("  %s:%s" % (name, work.packages[package][name]))
     else:
         _log.log(HINT, "have %s packages (use -2 to show them)" %
                  len(work.packages))
     if opts.debian_control:
         done += opts.debian_control
         for line in work.debian_control():
-            print line
+            print(line)
     if opts.debian_copyright:
         done += opts.debian_copyright
         for line in work.debian_copyright():
-            print line
+            print(line)
     if opts.debian_install:
         done += opts.debian_install
         for line in work.debian_install():
-            print line
+            print(line)
     if opts.debian_changelog:
         done += opts.debian_changelog
         for line in work.debian_changelog():
-            print line
+            print(line)
     if opts.debian_rules:
         done += opts.debian_rules
         for line in work.debian_rules():
-            print line
+            print(line)
     if opts.debian_patches:
         done += opts.debian_patches
         for line in work.debian_patches():
-            print line
+            print(line)
     if opts.debian_scripts:
         done += opts.debian_scripts
         for line in work.debian_scripts():
-            print line
+            print(line)
     if opts.debian_dsc:
         done += opts.debian_dsc
         for line in work.debian_dsc():
-            print line
+            print(line)
     if opts.debian_diff:
         done += opts.debian_diff
         for line in work.debian_diff():
-            print line
+            print(line)
     auto = False
     if opts.d:
         if not opts.dsc:
@@ -1956,18 +1960,10 @@ if __name__ == "__main__":
     if opts.extract:
         cmd = "cd %s && dpkg-source -x %s" % (opts.d or ".", opts.dsc)
         _log.log(HINT, cmd)
-        status, output = commands.getstatusoutput(cmd)
-        if status:
-            _log.fatal("dpkg-source -x failed with %s#%s:\n %s",
-                       status >> 8, status & 255, output)
-        else:
-            _log.info("%s", output)
+        output = subprocess.check_output(cmd, shell=True)
+        _log.info("%s", output)
     if opts.build:
         cmd = "cd %s && dpkg-source -b %s" % (opts.d or ".", work.deb_src())
         _log.log(HINT, cmd)
-        status, output = commands.getstatusoutput(cmd)
-        if status:
-            _log.fatal("dpkg-source -b failed with %s#%s:\n %s",
-                       status >> 8, status & 255, output)
-        else:
-            _log.info("%s", output)
+        output = subprocess.check_output(cmd, shell=True)
+        _log.info("%s", output)
