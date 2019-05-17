@@ -470,7 +470,7 @@ class RpmSpecToDebianControl:
         found_package = self.on_package.match(default)
         assert found_package
         self.start_package(found_package)
-        for line in open(rpmspec):
+        for line in io.open(rpmspec, 'r', encoding='utf8'):
             if self.state() in ["package"]:
                 found_default_var1 = self.on_default_var1.match(line)
                 found_default_var2 = self.on_default_var2.match(line)
