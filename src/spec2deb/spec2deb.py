@@ -250,7 +250,11 @@ class RpmSpecToDebianControl:
         if not self.states:
             self.states = [""]
         self.states[0] = state
+
+    # %files -n explicit-package-name
     on_explicit_package = re.compile(r"-n\s+(\S+)")
+    # %files -f list-of-files
+    on_files_file = re.compile(r"-f\s+(\S+)")
 
     def new_package(self, package, options):
         package = package or ""
@@ -265,6 +269,28 @@ class RpmSpecToDebianControl:
             else:
                 self.package = "%{name}"
         self.packages.setdefault(self.package, {})
+
+        # is there a -f flag with the list of files?
+        found = self.on_files_file.search(options)
+        if found:
+            # a workaround. the file containing the list of files to install does not exist yet.
+            # It will only exist after the %install section.
+            # therefore after the install section; append that file to the list of files to install
+            # NOTE: the install section exists only for the main package.
+            self.packages["%{name}"].setdefault("%install", []).append("""
+#spec2deb inserted:
+set +x
+while read line; do
+    if [[ $line =~ %dir ]]; then
+        line=${{line#*/}} # remove %dir prefix and leading /
+        echo "$line" >> debian/{package_name}.dirs
+    else
+        line=${{line#/}} # remove leading /
+        echo "$line" >> debian/{package_name}.install
+    fi
+done < {files}""".format(
+                files=found.group(1), package_name=self.deb_package_name(self.expand(self.package))))
+
     on_requires = re.compile(
         r"([\w.+_-]+(\s+(=>|>=|>|<|=<|<=|=|==)\s+(\w+:)?[\w.~+_-]+)?)")
 
@@ -449,6 +475,8 @@ class RpmSpecToDebianControl:
 
     def endof_scripts(self):
         self.append_setting(self.section, self.sectiontext)
+
+    # %files [ -f /path/to/filename ] [ subpackage ]
     on_files = re.compile(r"%(files)(?:\s+(\S+))?(?:\s+(-.*))?")
 
     def start_files(self, found_files):
