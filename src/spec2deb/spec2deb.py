@@ -109,6 +109,9 @@ usr_lib_rpm_macros = """# copy-n-paste from /usr/lib/rpm/macros
 %_includedir            %{_prefix}/include
 %_infodir               %{_datadir}/info
 %_mandir                %{_datadir}/man
+%_jvmdir                %{_libdir}/jvm
+%_jvmjardir             %{_libdir}/jvm-exports
+%_jvmprivdir            %{_libdir}/jvm-private
 
 %_tmppath               %{_var}/tmp
 %_docdir                %{_datadir}/doc
