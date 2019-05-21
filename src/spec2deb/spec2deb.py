@@ -1542,27 +1542,6 @@ done < {files}""".format(
 
     def debian_patches(self, nextfile=_nextfile):
         patches = []
-        for n in xrange(1, 100):
-            source = self.get("source%i" % n)
-            if source:
-                try:
-                    source = os.path.basename(source)  # strip any URL prefix
-                    _log.debug("append source%i '%s' as a patch", n, source)
-                    if source in ["format"]:
-                        _log.fatal(
-                            "ignored source%i: %s -> conflict with debian/source/format", n, source)
-                        continue
-                    sourcepath = "debian/source/"+source
-                    textfile = open(source)
-                    yield nextfile+sourcepath
-                    for line in textfile:
-                        yield "+"+line
-                    textfile.close()
-                    # patches.append(source) -> do not do this anymore
-                    self.set("SOURCE%i" % n, "$(CURDIR)/"+sourcepath, "source")
-                except Exception as e:
-                    _log.error(
-                        "append source%i '%s' failed:\n %s", n, source, e)
         patch = self.get("patch")
         if patch:
             patches.append(patch)
