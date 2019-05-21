@@ -1923,7 +1923,7 @@ def main(args_in):
     if opts.d:
         opts.d += "/"
         if not opts.dsc:
-            opts.dsc = spec+".dsc"
+            opts.dsc = os.path.join(opts.d, os.path.basename(spec) + ".dsc")
         if not opts.diff:
             if "3." in work.source_format:
                 opts.diff = "%s_%s.debian.tar.gz" % (
