@@ -1622,13 +1622,13 @@ done < {files}""".format(
             return self.write_debian_tar(filename, into=into)
         filepath = os.path.join(into or "", filename)
         if filename.endswith(".gz"):
-            f = gzip.open(filepath, "w")
+            f = gzip.open(filepath, "wb")
         else:
             f = open(filepath, "w")
         try:
             count = 0
             for line in self.debian_diff():
-                f.write(line+"\n")
+                f.write((line + "\n").encode('utf-8'))
                 count += 1
             f.close()
             self.debian_file = filename
