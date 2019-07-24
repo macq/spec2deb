@@ -261,7 +261,7 @@ class RpmSpecToDebianControl:
         options = options or ""
         found = self.on_explicit_package.search(options)
         if found:
-            self.package = found.group(0)
+            self.package = found.group(1)
         else:
             name = package.strip()
             if name:
@@ -427,13 +427,18 @@ done < {files}""".format(
         if typed != "global":
             _log.warning(
                 "do not use %%define in default-variables, use %%global %s", name)
-    on_package = re.compile(r"%(package)(?:\s+(\S+))?(?:\s+(-.*))?")
+
+    # %package [ -n package-name ] [ subpackage ]
+    on_package = re.compile(r"%(package)\b(?:\s+([^-]\S*))?(?:\s+(-.*))?")
 
     def start_package(self, found_package):
         _, package, options = found_package.groups()
         self.new_package(package, options)
         self.new_state("package")
-    on_description = re.compile(r"%(description)(?:\s+(\S+))?(?:\s+(-.*))?")
+
+    # %description [ -n package-name ] [ subpackage ]
+    on_description = re.compile(
+        r"%(description)\b(?:\s+([^-]\S*))?(?:\s+(-.*))?")
 
     def start_description(self, found_description):
         rule, package, options = found_description.groups()
