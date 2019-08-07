@@ -469,8 +469,9 @@ done < {files}""".format(
 
     def endof_rules(self):
         self.append_setting(self.section, self.sectiontext)
+
     on_scripts = re.compile(
-        r"%(post|postun|pre|preun)\b(?:\s+(\w\S+))?(?:\s+(-.*))?")
+        r"%(post|postun|pre|preun)\b(?:\s+([^-]\S*))?(?:\s+(-.*))?")
 
     def start_scripts(self, found_scripts):
         rule, package, options = found_scripts.groups()
@@ -482,7 +483,7 @@ done < {files}""".format(
         self.append_setting(self.section, self.sectiontext)
 
     # %files [ -f /path/to/filename ] [ subpackage ]
-    on_files = re.compile(r"%(files)(?:\s+(\S+))?(?:\s+(-.*))?")
+    on_files = re.compile(r"%(files)\b(?:\s+([^-]\S*))?(?:\s+(-.*))?")
 
     def start_files(self, found_files):
         rule, package, options = found_files.groups()
