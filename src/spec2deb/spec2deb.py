@@ -925,15 +925,7 @@ done < {files}""".format(
         return self.get("name")
 
     def deb_src(self):
-        script = self.packages["%{name}"].get("%prep", "")
-        for part in script:
-            for line in part.split("\n"):
-                if line.startswith("%setup"):
-                    m = re.search("-n\s+(	 \S+)", line)
-                    if m:
-                        return m.group(1)
-                    return self.deb_source()+"-"+self.deb_version()
-        _log.error("no %setup in %prep section found")
+        return self.deb_source()+"-"+self.deb_version()
 
     def deb_version(self):
         if self.cache_version is None:
