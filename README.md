@@ -43,13 +43,9 @@ generated from the rpm build script parts.
 
 ## Download ##
 
-Get a source snapshot from one of the tags at Bitbucket:   
-<https://bitbucket.org/guidod/spec2deb/downloads/>
-
-Examples for existing DEBs converted from RPMs can be seen in:   
-<https://build.opensuse.org/package/show?project=home:guidod>
+Get a source snapshot from one of the tags:
+<https://github.com/macq/spec2deb/releases>
 
 ## Documentation ##
 
-There is additional documentation in the README.TXT in the project sources.
- * <https://bitbucket.org/guidod/spec2deb/raw/-1/src/README.TXT>
+There is additional documentation in the [README.TXT](src/README.txt) in the project sources.
