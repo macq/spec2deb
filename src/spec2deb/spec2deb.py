@@ -1333,33 +1333,33 @@ done < {files}""".format(
         yield "+"
         yield "+# These are used for cross-compiling and for saving the configure script"
         yield "+# from having to guess our platform (since we know it already)"
-        yield "+DEB_HOST_GNU_TYPE	?= $(shell dpkg-architecture -qDEB_HOST_GNU_TYPE)"
-        yield "+DEB_BUILD_GNU_TYPE	?= $(shell dpkg-architecture -qDEB_BUILD_GNU_TYPE)"
+        yield "+DEB_HOST_GNU_TYPE  ?= $(shell dpkg-architecture -qDEB_HOST_GNU_TYPE)"
+        yield "+DEB_BUILD_GNU_TYPE ?= $(shell dpkg-architecture -qDEB_BUILD_GNU_TYPE)"
         yield "+"
         yield "+"
         yield "+CFLAGS = -Wall -g"
         yield "+"
         yield "+ifneq (,$(findstring noopt,$(DEB_BUILD_OPTIONS)))"
-        yield "+	   CFLAGS += -O0"
+        yield "+           CFLAGS += -O0"
         yield "+else"
-        yield "+	   CFLAGS += -O2"
+        yield "+           CFLAGS += -O2"
         yield "+endif"
         yield "+ifeq (,$(findstring nostrip,$(DEB_BUILD_OPTIONS)))"
-        yield "+	   INSTALL_PROGRAM += -s"
+        yield "+           INSTALL_PROGRAM += -s"
         yield "+endif"
-#		yield "+"
-#		for name in self.has_names():
-#			if name.startswith("_"):
-#				value = self.get(name)
-#				value2 = re.sub(r"[%][{](\w+)[}]", r"$(\1)", value)
-#				yield "+%s=%s" % (name, value2)
+#                yield "+"
+#                for name in self.has_names():
+#                        if name.startswith("_"):
+#                                value = self.get(name)
+#                                value2 = re.sub(r"[%][{](\w+)[}]", r"$(\1)", value)
+#                                yield "+%s=%s" % (name, value2)
         yield "+"
         yield "+configure: configure-stamp"
         yield "+configure-stamp:"
         yield "+\tdh_testdir"
         yield "+\tbash debian/prep.sh"
-#		for line in self.deb_script("%prep"):
-#			yield "+\t"+line
+#                for line in self.deb_script("%prep"):
+#                        yield "+\t"+line
         yield "+\t#"
         yield "+\ttouch configure-stamp"
         yield "+"
@@ -1367,8 +1367,8 @@ done < {files}""".format(
         yield "+build-stamp: configure-stamp"
         yield "+\tdh_testdir"
         yield "+\tbash debian/build.sh"
-#		for line in self.deb_script("%build"):
-#			yield "+\t"+line
+#                for line in self.deb_script("%build"):
+#                        yield "+\t"+line
         yield "+\t#"
         yield "+\ttouch build-stamp"
         yield "+"
@@ -1386,10 +1386,10 @@ done < {files}""".format(
         yield "+\tdh_installdirs"
         yield "+\t# Add here commands to install the package into debian/tmp"
         yield "+\tmkdir -p debian/tmp"
-        # +		  $(MAKE) install DESTDIR=$(CURDIR)/debian/tmp
+        # +                  $(MAKE) install DESTDIR=$(CURDIR)/debian/tmp
         yield "+\tbash debian/install.sh"
-#		for line in self.deb_script("%install"):
-#			yield "+\t"+line
+#                for line in self.deb_script("%install"):
+#                        yield "+\t"+line
         yield "+\t# Move all files in their corresponding package"
         yield "+\tdh_install --list-missing --fail-missing --sourcedir=debian/tmp"
         yield "+\t# empty dependency_libs in .la files"
@@ -1441,8 +1441,6 @@ done < {files}""".format(
                     line = re.sub("[%][{][!][?]_with[^{}]*[}]", "", line)
                     if old == line:
                         break
-                # line = line.replace("%buildroot", "$(CURDIR)/debian/tmp")
-                # line = line.replace("%{buildroot}", "$(CURDIR)/debian/tmp")
                 line = line.replace("$RPM_OPT_FLAGS", "$(CFLAGS)")
                 line = line.replace("%{?jobs:-j%jobs}", "")
                 old = line
