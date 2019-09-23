@@ -48,7 +48,7 @@ if os.path.isdir(".osc"):
 #       debian.* in the sources area. Therefore the debian file must be
 #       named "debian.diff.gz" for OBS and NOT "package.debian.diff.gz".
 #       (check https://github.com/openSUSE/obs-build/blob/master/build
-#        and look for "DEB_TRANSFORM=true" and its if-condition)
+#       and look for "DEB_TRANSFORM=true" and its if-condition)
 # NOTE: debtransform itself is also right there:
 #       https://github.com/openSUSE/obs-build/blob/master/debtransform
 #       https://github.com/openSUSE/obs-build/blob/master/debtransformbz2
@@ -332,6 +332,7 @@ done < {files}""".format(
 
     def append_section(self, text=None):
         self.sectiontext += text or ""
+
     on_variable = re.compile(r"\s*%(define|global)\s+(\S+)\s+(.*)")
 
     def save_variable(self, found_variable):
@@ -387,6 +388,7 @@ done < {files}""".format(
         if "skip-if" in self.states:
             return True
         return False
+
     on_default_var1 = re.compile(
         r"\s*%\{!\?(\w+):\s+%(define|global)\s+\1\b(.*)\}")
 
@@ -399,6 +401,7 @@ done < {files}""".format(
         if typed != "global":
             _log.warning(
                 "do not use %%define in default-variables, use %%global %s", name)
+
     on_default_var2 = re.compile(
         r"\s*[%][{][!][?](\w+)[:]\s*[%][{][?](\w+)[:]\s*[%](define|global)\s+\1\b(.*)[}][}]")
 
@@ -413,6 +416,7 @@ done < {files}""".format(
         if typed != "global":
             _log.warning(
                 "do not use %%define in default-variables, use %%global %s", name)
+
     on_default_var3 = re.compile(
         r"\s*[%][{][!][?](\w+)[:]\s*[%][{][?](\w+)[:]\s*[%](define|global)\s+\1\b(.*)[}][}]")
 
@@ -448,6 +452,7 @@ done < {files}""".format(
 
     def endof_description(self):
         self.append_setting(self.section, self.sectiontext)
+
     on_changelog = re.compile(r"%(changelog)(\s*)")
 
     def start_changelog(self, found_changelog):
@@ -458,6 +463,7 @@ done < {files}""".format(
 
     def endof_changelog(self):
         self.append_setting(self.section, self.sectiontext)
+
     on_rules = re.compile(r"%(prep|build|install|check|clean)\b(?:\s+(-.*))?")
 
     def start_rules(self, found_rules):
@@ -770,6 +776,7 @@ done < {files}""".format(
             self.endof_changelog()
         else:
             _log.fatal("UNKNOWN state %s (at end of file)", self.states)
+
     on_embedded_name = re.compile(r"[%](\w+)\b")
     on_required_name = re.compile(r"[%][{](\w+)[}]")
     on_optional_name = re.compile(r"[%][{]([!]?[?])(\w+):?(\w+)?[}]")
@@ -1499,7 +1506,7 @@ done < {files}""".format(
         fi
         """
         postinst = """
-        if       [ "configure" = "$1" ] && [ "." = ".$2" ]; then  shift ; set -- "1" "$@"
+        if   [ "configure" = "$1" ] && [ "." = ".$2" ]; then  shift ; set -- "1" "$@"
         elif [ "configure" = "$1" ] && [ "." != ".$2" ]; then shift ; set -- "2" "$@"
         fi
         """
