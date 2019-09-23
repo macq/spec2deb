@@ -1,0 +1,293 @@
+--- pkg-1.2.3.orig/debian/control
++++ pkg-1.2.3/debian/control
+@@ -0,0 +1,44 @@
++Priority: optional
++Maintainer: unknown <unknown@debian.org>
++Source: pkg
++Build-Depends: debhelper (>= 5), package1-dev (= 1.2.3-0), package2-dev (= 2.0.0-0), package3-dev (>> 1.2.3-0), package4-dev (>= 1.2.3-0), package5-dev (>= 1.2.3-0), package6-dev (<< 1.2.3-0), package7-dev (<= 1.2.3-0), package8-dev (<= 1.2.3-0), package9-dev
++Standards-Version: 3.8.2
++Homepage: http://some-url/
++
++Package: other-pkg
++Section: utils
++Architecture: any
++Depends: ${shlibs:Depends}, ${misc:Depends}
++Description: .
++
++Package: other-pkg-dev
++Section: libs
++Architecture: any
++Depends: other-pkg (= 1.2.3-4), ${shlibs:Depends}, ${misc:Depends}
++Description: Development files for other-pkg
++
++Package: pkg
++Section: utils
++Architecture: any
++Depends: package1 (= 1.2.3-0), package2 (= 2.0.0-0), package3 (>> 1.2.3-0), package4 (>= 1.2.3-0), package5 (>= 1.2.3-0), package6 (<< 1.2.3-0), package7 (<= 1.2.3-0), package8 (<= 1.2.3-0), package9, ${shlibs:Depends}, ${misc:Depends}
++Provides: prov-pkg1 (= 1.2.3-0), prov-pkg2 (= 2.0.0-0), prov-pkg3 (>> 1.2.3-0), prov-pkg4 (>= 1.2.3-0), prov-pkg5 (>= 1.2.3-0), prov-pkg6 (<< 1.2.3-0), prov-pkg7 (<= 1.2.3-0), prov-pkg8 (<= 1.2.3-0)
++Description: project summary
++
++Package: pkg-dev
++Section: libs
++Architecture: any
++Depends: pkg (= 1.2.3-4), ${shlibs:Depends}, ${misc:Depends}
++Description: Development files for pkg
++
++Package: pkg-with-dash
++Section: utils
++Architecture: any
++Depends: pkg (= 1.2.3-4), ${shlibs:Depends}, ${misc:Depends}
++Description: with-dash subpackage
++
++Package: pkg-x
++Section: libs
++Architecture: any
++Depends: other-pkg (= 1.2.3-4), some-x-package, ${shlibs:Depends}, ${misc:Depends}
++Description: other dependencies
++
+--- pkg-1.2.3.orig/debian/copyright
++++ pkg-1.2.3/debian/copyright
+@@ -0,0 +1,1 @@
++License: Proprietary
+--- pkg-1.2.3.orig/debian/other-pkg.install
++++ pkg-1.2.3/debian/other-pkg.install
+@@ -0,0 +1,1 @@
++dir2/b
+--- pkg-1.2.3.orig/debian/other-pkg-dev.install
++++ pkg-1.2.3/debian/other-pkg-dev.install
+@@ -0,0 +1,1 @@
++dir2/c
+--- pkg-1.2.3.orig/debian/pkg.install
++++ pkg-1.2.3/debian/pkg.install
+@@ -0,0 +1,1 @@
++dir2/
+--- pkg-1.2.3.orig/debian/pkg-dev.install
++++ pkg-1.2.3/debian/pkg-dev.install
+@@ -0,0 +1,1 @@
++dir2/a
+--- pkg-1.2.3.orig/debian/pkg-with-dash.install
++++ pkg-1.2.3/debian/pkg-with-dash.install
+@@ -0,0 +1,1 @@
++dir2/c
+--- pkg-1.2.3.orig/debian/changelog
++++ pkg-1.2.3/debian/changelog
+@@ -0,0 +1,5 @@
++pkg (1.2.3-4) unstable; urgency=low
++
++  * generated OBS deb build
++
++ -- unknown <unknown@debian.org>  Mon, 25 Dec 2007 10:50:38 +0100
+--- pkg-1.2.3.orig/debian/source/format
++++ pkg-1.2.3/debian/source/format
+@@ -0,0 +1,1 @@
++1.0
+--- pkg-1.2.3.orig/debian/compat
++++ pkg-1.2.3/debian/compat
+@@ -0,0 +1,1 @@
++5
+--- pkg-1.2.3.orig/debian/vars
++++ pkg-1.2.3/debian/vars
+@@ -0,0 +1,35 @@
++RPM_BUILD_ROOT=$(pwd)/debian/tmp
++CURDIR=$(pwd)
++_usr=/usr
++_usrsrc=${_usr}/src
++_var=/var
++__cp=/bin/cp
++__install=/usr/bin/install
++__mkdir=/bin/mkdir
++__mv=/bin/mv
++__perl=/usr/bin/perl
++__python=/usr/bin/python
++__rm=/bin/rm
++__sed=/usr/bin/sed
++__tar=/bin/tar
++__unzip=/usr/bin/unzip
++_prefix=/usr
++_exec_prefix=${_prefix}
++_bindir=${_exec_prefix}/bin
++_sbindir=${_exec_prefix}/sbin
++_libexecdir=${_exec_prefix}/libexec
++_datadir=${_prefix}/share
++_sysconfdir=/etc
++_sharedstatedir=${_prefix}/com
++_localstatedir=${_prefix}/var
++_lib=lib
++_libdir=${_exec_prefix}/${_lib}
++_includedir=${_prefix}/include
++_infodir=${_datadir}/info
++_mandir=${_datadir}/man
++_jvmdir=${_libdir}/jvm
++_jvmjardir=${_libdir}/jvm-exports
++_jvmprivdir=${_libdir}/jvm-private
++_tmppath=${_var}/tmp
++_docdir=${_datadir}/doc
++__make=/usr/bin/make
+--- pkg-1.2.3.orig/debian/prep.sh
++++ pkg-1.2.3/debian/prep.sh
+@@ -0,0 +1,4 @@
++#!/bin/bash
++. debian/vars
++set -e
++set -x
+--- pkg-1.2.3.orig/debian/build.sh
++++ pkg-1.2.3/debian/build.sh
+@@ -0,0 +1,5 @@
++#!/bin/bash
++. debian/vars
++set -e
++set -x
++echo spec2deb inserted check section after build.
+--- pkg-1.2.3.orig/debian/install.sh
++++ pkg-1.2.3/debian/install.sh
+@@ -0,0 +1,22 @@
++#!/bin/bash
++. debian/vars
++set -e
++set -x
++touch ${RPM_BUILD_ROOT}/file1
++install -d ${RPM_BUILD_ROOT}/dir2
++touch ${RPM_BUILD_ROOT}/dir2/a
++touch ${RPM_BUILD_ROOT}/dir2/b
++touch ${RPM_BUILD_ROOT}/dir2/c
++find $RPM_BUILD_ROOT -type d | sed 's|'$RPM_BUILD_ROOT'|%dir |' >  list-of-files
++find $RPM_BUILD_ROOT -type f -o -type l | sed 's|'$RPM_BUILD_ROOT'||' >> list-of-files
++#spec2deb inserted:
++set +x
++while read line; do
++    if [[ $line =~ %dir ]]; then \
++        line=${line#*/} # remove %dir prefix and leading /; \
++        echo "$line" >> debian/pkg.dirs; \
++    else \
++        line=${line#/} # remove leading /; \
++        echo "$line" >> debian/pkg.install; \
++    fi
++done < list-of-files
+--- pkg-1.2.3.orig/debian/rules
++++ pkg-1.2.3/debian/rules
+@@ -0,0 +1,79 @@
++#!/usr/bin/make -f
++# -*- makefile -*-
++# Uncomment this to turn on verbose mode.
++#export DH_VERBOSE=1
++
++# These are used for cross-compiling and for saving the configure script
++# from having to guess our platform (since we know it already)
++DEB_HOST_GNU_TYPE  ?= $(shell dpkg-architecture -qDEB_HOST_GNU_TYPE)
++DEB_BUILD_GNU_TYPE ?= $(shell dpkg-architecture -qDEB_BUILD_GNU_TYPE)
++
++
++CFLAGS = -Wall -g
++
++ifneq (,$(findstring noopt,$(DEB_BUILD_OPTIONS)))
++           CFLAGS += -O0
++else
++           CFLAGS += -O2
++endif
++ifeq (,$(findstring nostrip,$(DEB_BUILD_OPTIONS)))
++           INSTALL_PROGRAM += -s
++endif
++
++configure: configure-stamp
++configure-stamp:
++	dh_testdir
++	bash debian/prep.sh
++	#
++	touch configure-stamp
++
++build: build-stamp
++build-stamp: configure-stamp
++	dh_testdir
++	bash debian/build.sh
++	#
++	touch build-stamp
++
++clean:
++	dh_testdir
++	dh_testroot
++	rm -f configure-stamp build-stamp
++	dh_auto_clean
++	dh_clean
++
++install: build
++	dh_testdir
++	dh_testroot
++	dh_prep
++	dh_installdirs
++	# Add here commands to install the package into debian/tmp
++	mkdir -p debian/tmp
++	bash debian/install.sh
++	# Move all files in their corresponding package
++	dh_install --list-missing --fail-missing --sourcedir=debian/tmp
++	# empty dependency_libs in .la files
++	find debian/ -name '*.la' -exec sed -i "/dependency_libs/ s/'.*'/''/" {} \;
++
++# Build architecture-independent files here.
++binary-indep: build install
++# We have nothing to do by default.
++
++# Build architecture-dependent files here.
++binary-arch: build install
++	dh_testdir
++	dh_testroot
++	dh_installdocs
++	dh_installexamples
++	dh_installman
++	dh_link
++	dh_strip
++	dh_compress
++	dh_makeshlibs -V
++	dh_installdeb
++	dh_shlibdeps
++	dh_gencontrol
++	dh_md5sums
++	dh_builddeb
++
++binary: binary-indep binary-arch
++.PHONY: build clean binary-indep binary-arch binary install
+--- pkg-1.2.3.orig/debian/other-pkg.postinst
++++ pkg-1.2.3/debian/other-pkg.postinst
+@@ -0,0 +1,6 @@
++#!/bin/bash
++if   [ "configure" = "$1" ] && [ "." = ".$2" ]; then  shift ; set -- "1" "$@"
++elif [ "configure" = "$1" ] && [ "." != ".$2" ]; then shift ; set -- "2" "$@"
++fi
++
++dpkg -L other-pkg | grep '^/dir2/b' | xargs -d '\n' -i chown root:root {} || true
+--- pkg-1.2.3.orig/debian/other-pkg-dev.postinst
++++ pkg-1.2.3/debian/other-pkg-dev.postinst
+@@ -0,0 +1,6 @@
++#!/bin/bash
++if   [ "configure" = "$1" ] && [ "." = ".$2" ]; then  shift ; set -- "1" "$@"
++elif [ "configure" = "$1" ] && [ "." != ".$2" ]; then shift ; set -- "2" "$@"
++fi
++
++dpkg -L other-pkg-dev | grep '^/dir2/c' | xargs -d '\n' -i chown root:root {} || true
+--- pkg-1.2.3.orig/debian/pkg.postinst
++++ pkg-1.2.3/debian/pkg.postinst
+@@ -0,0 +1,7 @@
++#!/bin/bash
++if   [ "configure" = "$1" ] && [ "." = ".$2" ]; then  shift ; set -- "1" "$@"
++elif [ "configure" = "$1" ] && [ "." != ".$2" ]; then shift ; set -- "2" "$@"
++fi
++
++dpkg -L pkg | grep '^/dir2' | xargs -d '\n' -i chmod 1754 {} || true
++dpkg -L pkg | grep '^/dir2' | xargs -d '\n' -i chown user1:group1 {} || true
+--- pkg-1.2.3.orig/debian/pkg-dev.postinst
++++ pkg-1.2.3/debian/pkg-dev.postinst
+@@ -0,0 +1,6 @@
++#!/bin/bash
++if   [ "configure" = "$1" ] && [ "." = ".$2" ]; then  shift ; set -- "1" "$@"
++elif [ "configure" = "$1" ] && [ "." != ".$2" ]; then shift ; set -- "2" "$@"
++fi
++
++dpkg -L pkg-dev | grep '^/dir2/a' | xargs -d '\n' -i chown root:root {} || true
+--- pkg-1.2.3.orig/debian/pkg-with-dash.postinst
++++ pkg-1.2.3/debian/pkg-with-dash.postinst
+@@ -0,0 +1,6 @@
++#!/bin/bash
++if   [ "configure" = "$1" ] && [ "." = ".$2" ]; then  shift ; set -- "1" "$@"
++elif [ "configure" = "$1" ] && [ "." != ".$2" ]; then shift ; set -- "2" "$@"
++fi
++
++dpkg -L pkg-with-dash | grep '^/dir2/c' | xargs -d '\n' -i chown root:root {} || true
