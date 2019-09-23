@@ -49,3 +49,12 @@ Get a source snapshot from one of the tags:
 ## Documentation ##
 
 There is additional documentation in the [README.TXT](src/README.txt) in the project sources.
+
+## Functional tests ##
+
+inside `src` directory:
+
+```
+python3 -m coverage run --branch test/run_tests.py
+python3 -m coverage report -m
+```
