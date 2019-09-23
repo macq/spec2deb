@@ -1,6 +1,6 @@
 --- pkg-1.2.3.orig/debian/control
 +++ pkg-1.2.3/debian/control
-@@ -0,0 +1,44 @@
+@@ -0,0 +1,46 @@
 +Priority: optional
 +Maintainer: unknown <unknown@debian.org>
 +Source: pkg
@@ -25,6 +25,8 @@
 +Architecture: any
 +Depends: package1 (= 1.2.3-0), package2 (= 2.0.0-0), package3 (>> 1.2.3-0), package4 (>= 1.2.3-0), package5 (>= 1.2.3-0), package6 (<< 1.2.3-0), package7 (<= 1.2.3-0), package8 (<= 1.2.3-0), package9, ${shlibs:Depends}, ${misc:Depends}
 +Provides: prov-pkg1 (= 1.2.3-0), prov-pkg2 (= 2.0.0-0), prov-pkg3 (>> 1.2.3-0), prov-pkg4 (>= 1.2.3-0), prov-pkg5 (>= 1.2.3-0), prov-pkg6 (<< 1.2.3-0), prov-pkg7 (<= 1.2.3-0), prov-pkg8 (<= 1.2.3-0)
++Replaces: previous-pkg-name
++Conflicts: previous-pkg-name, conflicting-pkg
 +Description: project summary
 +
 +Package: pkg-dev

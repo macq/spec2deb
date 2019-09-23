@@ -33,6 +33,8 @@ Provides:      prov-pkg6 < 1.2.3-0
 Provides:      prov-pkg7 <= 1.2.3-0
 Provides:      prov-pkg8 =< 1.2.3-0
 #Provides:      prov-pkg9 #this is now converted like prov-pkg9 (= 0.0.0); not sure that is right.
+Obsoletes:     previous-pkg-name
+Conflicts:     conflicting-pkg
 BuildRoot:     %{_tmppath}/%{name}-%{version}-build
 Source:        %{name}-%{version}.tgz
 
