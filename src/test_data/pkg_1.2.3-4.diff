@@ -135,12 +135,13 @@
 +set -x
 --- pkg-1.2.3.orig/debian/build.sh
 +++ pkg-1.2.3/debian/build.sh
-@@ -0,0 +1,5 @@
+@@ -0,0 +1,6 @@
 +#!/bin/bash
 +. debian/vars
 +set -e
 +set -x
 +echo spec2deb inserted check section after build.
++./unit-tests
 --- pkg-1.2.3.orig/debian/install.sh
 +++ pkg-1.2.3/debian/install.sh
 @@ -0,0 +1,25 @@
@@ -271,23 +272,43 @@
 +dpkg -L other-pkg-dev | grep '^/dir2/c' | xargs -d '\n' -i chown root:root {} || true
 --- pkg-1.2.3.orig/debian/pkg.preinst
 +++ pkg-1.2.3/debian/pkg.preinst
-@@ -0,0 +1,6 @@
+@@ -0,0 +1,7 @@
 +#!/bin/bash
 +if   [ "install" = "$1" ]; then  shift ; set -- "0" "$@"
 +elif [ "update" = "$1" ]; then   shift ; set -- "1" "$@"
 +fi
 +
++echo pre
 +echo "other vendor"
 --- pkg-1.2.3.orig/debian/pkg.postinst
 +++ pkg-1.2.3/debian/pkg.postinst
-@@ -0,0 +1,7 @@
+@@ -0,0 +1,8 @@
 +#!/bin/bash
 +if   [ "configure" = "$1" ] && [ "." = ".$2" ]; then  shift ; set -- "1" "$@"
 +elif [ "configure" = "$1" ] && [ "." != ".$2" ]; then shift ; set -- "2" "$@"
 +fi
 +
++echo post
 +dpkg -L pkg | grep '^/dir2' | xargs -d '\n' -i chmod 1754 {} || true
 +dpkg -L pkg | grep '^/dir2' | xargs -d '\n' -i chown user1:group1 {} || true
+--- pkg-1.2.3.orig/debian/pkg.prerm
++++ pkg-1.2.3/debian/pkg.prerm
+@@ -0,0 +1,6 @@
++#!/bin/bash
++if   [ "remove" = "$1" ]; then  shift ; set -- "1" "$@"
++elif [ "upgrade" = "$1" ]; then shift ; set -- "2" "$@"
++fi
++
++echo preun
+--- pkg-1.2.3.orig/debian/pkg.postrm
++++ pkg-1.2.3/debian/pkg.postrm
+@@ -0,0 +1,6 @@
++#!/bin/bash
++if   [ "remove" = "$1" ]; then  shift ; set -- "0" "$@"
++elif [ "upgrade" = "$1" ]; then shift ; set -- "1" "$@"
++fi
++
++echo postun
 --- pkg-1.2.3.orig/debian/pkg-dev.postinst
 +++ pkg-1.2.3/debian/pkg-dev.postinst
 @@ -0,0 +1,6 @@

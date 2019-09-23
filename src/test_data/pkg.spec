@@ -107,11 +107,24 @@ find $RPM_BUILD_ROOT -type d | sed 's|'$RPM_BUILD_ROOT'|%dir |' >  list-of-files
 find $RPM_BUILD_ROOT -type f -o -type l | sed 's|'$RPM_BUILD_ROOT'||' >> list-of-files
 
 %pre
+echo pre
 %if "%{?_vendor}" == "bogus"
 echo "redhat vendor"
 %else
 echo "other vendor"
 %endif
+
+%preun
+echo preun
+
+%post
+echo post
+
+%postun
+echo postun
+
+%check
+./unit-tests
 
 %files -f list-of-files
 %defattr(1754,user1,group1)

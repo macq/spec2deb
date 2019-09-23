@@ -1315,7 +1315,7 @@ done < {files}""".format(
         if self.check:
             yield "+echo spec2deb inserted check section after build."
             for line in self.deb_script("%check"):
-                yield "+\t"+line
+                yield "+"+line
 
         yield nextfile+"debian/install.sh"
         yield "+#!/bin/bash"
