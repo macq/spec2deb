@@ -35,6 +35,15 @@ Provides:      prov-pkg8 =< 1.2.3-0
 #Provides:      prov-pkg9 #this is now converted like prov-pkg9 (= 0.0.0); not sure that is right.
 Obsoletes:     previous-pkg-name
 Conflicts:     conflicting-pkg
+
+%if 0%{?some_variable_that_does_not_exist}
+Requires:      should-not-get-here
+%define _git 123
+%else
+Requires:       git >= 1.8.3
+%define _git 0
+%endif
+
 BuildRoot:     %{_tmppath}/%{name}-%{version}-build
 Source:        %{name}-%{version}.tgz
 
@@ -91,6 +100,9 @@ install -d ${RPM_BUILD_ROOT}/dir2
 touch ${RPM_BUILD_ROOT}/dir2/a
 touch ${RPM_BUILD_ROOT}/dir2/b
 touch ${RPM_BUILD_ROOT}/dir2/c
+touch gitconfig{0,1,2}
+install -d ${RPM_BUILD_ROOT}/etc
+install -m 0644 gitconfig%_git ${RPM_BUILD_ROOT}/etc/gitconfig
 find $RPM_BUILD_ROOT -type d | sed 's|'$RPM_BUILD_ROOT'|%dir |' >  list-of-files
 find $RPM_BUILD_ROOT -type f -o -type l | sed 's|'$RPM_BUILD_ROOT'||' >> list-of-files
 

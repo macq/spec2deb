@@ -23,7 +23,7 @@
 +Package: pkg
 +Section: utils
 +Architecture: any
-+Depends: package1 (= 1.2.3-0), package2 (= 2.0.0-0), package3 (>> 1.2.3-0), package4 (>= 1.2.3-0), package5 (>= 1.2.3-0), package6 (<< 1.2.3-0), package7 (<= 1.2.3-0), package8 (<= 1.2.3-0), package9, ${shlibs:Depends}, ${misc:Depends}
++Depends: package1 (= 1.2.3-0), package2 (= 2.0.0-0), package3 (>> 1.2.3-0), package4 (>= 1.2.3-0), package5 (>= 1.2.3-0), package6 (<< 1.2.3-0), package7 (<= 1.2.3-0), package8 (<= 1.2.3-0), package9, git (>= 1.8.3), ${shlibs:Depends}, ${misc:Depends}
 +Provides: prov-pkg1 (= 1.2.3-0), prov-pkg2 (= 2.0.0-0), prov-pkg3 (>> 1.2.3-0), prov-pkg4 (>= 1.2.3-0), prov-pkg5 (>= 1.2.3-0), prov-pkg6 (<< 1.2.3-0), prov-pkg7 (<= 1.2.3-0), prov-pkg8 (<= 1.2.3-0)
 +Replaces: previous-pkg-name
 +Conflicts: previous-pkg-name, conflicting-pkg
@@ -89,7 +89,7 @@
 +5
 --- pkg-1.2.3.orig/debian/vars
 +++ pkg-1.2.3/debian/vars
-@@ -0,0 +1,35 @@
+@@ -0,0 +1,36 @@
 +RPM_BUILD_ROOT=$(pwd)/debian/tmp
 +CURDIR=$(pwd)
 +_usr=/usr
@@ -125,6 +125,7 @@
 +_tmppath=${_var}/tmp
 +_docdir=${_datadir}/doc
 +__make=/usr/bin/make
++_git=0
 --- pkg-1.2.3.orig/debian/prep.sh
 +++ pkg-1.2.3/debian/prep.sh
 @@ -0,0 +1,4 @@
@@ -142,7 +143,7 @@
 +echo spec2deb inserted check section after build.
 --- pkg-1.2.3.orig/debian/install.sh
 +++ pkg-1.2.3/debian/install.sh
-@@ -0,0 +1,22 @@
+@@ -0,0 +1,25 @@
 +#!/bin/bash
 +. debian/vars
 +set -e
@@ -152,6 +153,9 @@
 +touch ${RPM_BUILD_ROOT}/dir2/a
 +touch ${RPM_BUILD_ROOT}/dir2/b
 +touch ${RPM_BUILD_ROOT}/dir2/c
++touch gitconfig{0,1,2}
++install -d ${RPM_BUILD_ROOT}/etc
++install -m 0644 gitconfig0 ${RPM_BUILD_ROOT}/etc/gitconfig
 +find $RPM_BUILD_ROOT -type d | sed 's|'$RPM_BUILD_ROOT'|%dir |' >  list-of-files
 +find $RPM_BUILD_ROOT -type f -o -type l | sed 's|'$RPM_BUILD_ROOT'||' >> list-of-files
 +#spec2deb inserted:
