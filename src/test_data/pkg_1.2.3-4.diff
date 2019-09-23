@@ -265,6 +265,15 @@
 +fi
 +
 +dpkg -L other-pkg-dev | grep '^/dir2/c' | xargs -d '\n' -i chown root:root {} || true
+--- pkg-1.2.3.orig/debian/pkg.preinst
++++ pkg-1.2.3/debian/pkg.preinst
+@@ -0,0 +1,6 @@
++#!/bin/bash
++if   [ "install" = "$1" ]; then  shift ; set -- "0" "$@"
++elif [ "update" = "$1" ]; then   shift ; set -- "1" "$@"
++fi
++
++echo "other vendor"
 --- pkg-1.2.3.orig/debian/pkg.postinst
 +++ pkg-1.2.3/debian/pkg.postinst
 @@ -0,0 +1,7 @@
