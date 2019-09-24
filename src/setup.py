@@ -13,7 +13,7 @@ setup(
   keywords = 'rpm spec deb debian converter',
   author = 'Guido Draheim',
   author_email = 'guidod@gmx.de',
-  url = 'http://bitbucket.org/guidod/spec2deb',
+  url = 'https://github.com/macq/spec2deb',
   description = README,
   license = '''BSD''',
 )
