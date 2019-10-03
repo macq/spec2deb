@@ -1,0 +1,5 @@
+[run]
+include =
+    ./spec2deb/*.py
+omit =
+    ./test*/*.py

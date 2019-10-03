@@ -1,5 +1,7 @@
 ## spec2deb ##
 
+[![codecov](https://codecov.io/gh/macq/spec2deb/branch/master/graph/badge.svg)](https://codecov.io/gh/macq/spec2deb)
+
 This utility takes a rpm package.spec as input generating a series of
 debian-specific files like the package.dsc build descriptor and the
 debian.diff.gz / debian.tar.gz containing the control file and patches.
@@ -49,3 +51,12 @@ Get a source snapshot from one of the tags:
 ## Documentation ##
 
 There is additional documentation in the [README.TXT](src/README.txt) in the project sources.
+
+## Functional tests ##
+
+inside `src` directory:
+
+```
+python3 -m coverage run --branch test/run_tests.py
+python3 -m coverage report -m
+```
