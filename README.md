@@ -1,5 +1,6 @@
 ## spec2deb ##
 
+[![Build Status](https://travis-ci.org/macq/spec2deb.svg?branch=master)](https://travis-ci.org/macq/spec2deb)
 [![codecov](https://codecov.io/gh/macq/spec2deb/branch/master/graph/badge.svg)](https://codecov.io/gh/macq/spec2deb)
 
 This utility takes a rpm package.spec as input generating a series of
