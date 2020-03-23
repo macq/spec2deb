@@ -51,7 +51,7 @@ Get a source snapshot from one of the tags:
 
 ## Documentation ##
 
-There is additional documentation in the [README.TXT](src/README.txt) in the project sources.
+There is additional documentation in the [README.TXT](src/README.TXT) in the project sources.
 
 ## Functional tests ##
 
