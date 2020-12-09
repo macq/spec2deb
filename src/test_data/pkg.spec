@@ -54,6 +54,7 @@ Source:        %{name}-%{version}.tgz
 Group:         Development/Libraries
 Summary:       Development files for %{name}
 Requires:      %{name} = %{version}-%{release}
+BuildArch:     noarch
 
 %description devel
 %{summary}

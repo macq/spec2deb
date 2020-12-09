@@ -62,7 +62,7 @@ default_rpm_group = "System/Libraries"
 # set to Debian QA Group <packages@qa.debian.org>
 default_rpm_packager = "unknown <unknown@debian.org>"
 default_rpm_license = "unknown"
-package_architecture = "any"
+default_package_architecture = "any"
 package_importance = "optional"
 _package_importances = ["required", "important",
                         "standard", "optional", "extra"]
@@ -174,7 +174,6 @@ class RpmSpecToDebianControl:
         self.cache_packages2 = []
         self.cache_version = None
         self.cache_revision = None
-        self.architecture = package_architecture
 
     def has_names(self):
         return list(self.var.keys())
@@ -345,7 +344,7 @@ done < {files}""".format(
         value, = found_architecture.groups()
         if value == 'noarch':
             value = 'all'
-        self.architecture = value
+        self.append_setting("architecture", value)
 
     on_setting = re.compile(r"\s*(\w+)\s*:\s*(\S.*)")
 
@@ -959,7 +958,7 @@ done < {files}""".format(
         yield "+Source: %s" % self.expand(source)
         binaries = list(self.deb_packages())
         yield "+Binary: %s" % ", ".join(binaries)
-        yield "+Architecture: %s" % self.architecture
+        yield "+Architecture: %s" % self.get("architecture", [default_package_architecture])[0]
         yield "+Version: %s" % self.deb_revision_with_epoch()
         yield "+Maintainer: %s" % self.get("packager", default_rpm_packager)
         yield "+Standards-Version: %s" % self.standards_version
@@ -1117,7 +1116,7 @@ done < {files}""".format(
             group = self.packages[package].get("group", default_rpm_group)
             section = self.group2section(group)
             yield "+Section: %s" % section
-            yield "+Architecture: %s" % self.architecture
+            yield "+Architecture: %s" % self.packages[package].get("architecture", [default_package_architecture])[0]
             depends = self.packages[package].get("requires", [])
             if self.get("autoreqprov") == "yes":
                 depends.append("${shlibs:Depends}")

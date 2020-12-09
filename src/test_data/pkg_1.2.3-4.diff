@@ -31,7 +31,7 @@
 +
 +Package: pkg-dev
 +Section: libs
-+Architecture: any
++Architecture: all
 +Depends: pkg (= 1.2.3-4), ${shlibs:Depends}, ${misc:Depends}
 +Description: Development files for pkg
 +
